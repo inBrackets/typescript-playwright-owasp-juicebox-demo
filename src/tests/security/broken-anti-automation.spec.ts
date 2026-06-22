@@ -17,19 +17,19 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
     userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // CAPTCHA Bypass
+  // CAPTCHA Bypass — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-anti-automation.html#_submit_10_or_more_customer_feedbacks_within_20_seconds
   test('CAPTCHA Bypass: feedback endpoint must enforce CAPTCHA validation', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const captchaRes = await client.get('/api/Captchas', userToken);
-    const captchaBody = await captchaRes.json() as { data?: { answer: number; id: number } };
-    const answer = captchaBody.data?.answer ?? 0;
-    const captchaId = captchaBody.data?.id ?? 1;
+    const captchaRes = await client.get('/rest/captcha/', userToken);
+    const captchaBody = await captchaRes.json() as { captchaId?: number; answer?: string };
+    const captchaId = captchaBody.captchaId ?? 1;
+    const wrongAnswer = Number(captchaBody.answer ?? '0') + 1;
 
     const res = await client.post('/api/Feedbacks', {
       comment: 'captcha-bypass-test',
       rating: 3,
       captchaId,
-      captcha: answer + 1,
+      captcha: wrongAnswer,
     }, userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -38,7 +38,7 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
     ).not.toBe(201);
   });
 
-  // Extra Language
+  // Extra Language — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-anti-automation.html#_retrieve_the_language_file_that_never_made_it_into_production
   test('Extra Language: non-standard Accept-Language must not unlock extra translations', async ({ request }) => {
     const res = await request.get(`${BASE}/i18n/tlh_AA.json`);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -48,17 +48,32 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Multiple Likes
+  // Multiple Likes — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-anti-automation.html#_like_any_review_at_least_three_times_as_the_same_user
+  // The like endpoint is POST /rest/products/reviews/:reviewId/like — the review ID is
+  // a NeDB _id string. Calling /rest/products/1/reviews/like (wrong path) always returns
+  // 404 and never tests the actual rate-limiting vulnerability.
   test('Multiple Likes: same user must not like a review more than once', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
 
-    const firstLike  = await client.post('/rest/products/1/reviews/like', {}, userToken);
-    const secondLike = await client.post('/rest/products/1/reviews/like', {}, userToken);
+    // Fetch existing reviews for product 1 to obtain a real review ID
+    const reviewsRes = await client.get('/rest/products/1/reviews');
+    const reviewsBody = await reviewsRes.json() as { data?: Array<{ _id: string }> };
+    const reviews = reviewsBody.data ?? [];
+
+    if (reviews.length === 0) {
+      // No reviews seeded — cannot test this challenge
+      return;
+    }
+
+    const reviewId = reviews[0]._id;
+    const firstLike  = await client.post(`/rest/products/reviews/${reviewId}/like`, {}, userToken);
+    const secondLike = await client.post(`/rest/products/reviews/${reviewId}/like`, {}, userToken);
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // If the same user can like the same review twice (200 on second call), anti-automation is broken.
     expect(
       secondLike.status(),
-      'A second like from the same user must be rejected'
+      'A second like on the same review from the same user must be rejected (Multiple Likes vulnerability)'
     ).not.toBe(200);
   });
 

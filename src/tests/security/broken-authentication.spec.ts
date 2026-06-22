@@ -8,7 +8,7 @@ import { AuthHelper } from '../../helpers/auth.helper';
 
 test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
-  // Bjoern's Favorite Pet
+  // Bjoern's Favorite Pet — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_reset_the_password_of_bjoerns_owasp_account_via_the_forgot_password_mechanism
   test("Bjoern's Favorite Pet: security question answer must not be trivially guessable", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const commonPets = ['cat', 'dog', 'fish', 'bird', 'unikitty'];
@@ -28,7 +28,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).toBe(false);
   });
 
-  // Change Bender's Password
+  // Change Bender's Password — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
   test("Change Bender's Password: user must not change another account's password", async ({ request }) => {
     const auth = new AuthHelper(request);
     const userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
@@ -48,7 +48,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).not.toBe(200);
   });
 
-  // GDPR Data Erasure
+  // GDPR Data Erasure — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_log_in_with_chris_erased_user_account
   test('GDPR Data Erasure: deleted user account must not be usable for login', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const email = AuthHelper.uniqueEmail();
@@ -56,9 +56,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     await client.register(email, password);
     const token = await client.login(email, password);
 
-    const profileRes = await client.get('/api/Users/whoami', token);
-    const profileBody = await profileRes.json() as { data?: { id: number } };
-    const uid = profileBody.data?.id;
+    const uid = AuthHelper.getUserId(token);
 
     if (uid) {
       await client.delete(`/api/Users/${uid}`, token);

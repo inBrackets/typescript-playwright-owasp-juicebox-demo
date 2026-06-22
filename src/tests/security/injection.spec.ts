@@ -31,7 +31,7 @@ async function assertLoginBlocked(page: Page, email: string, password: string): 
 
 test.describe('Injection (OWASP A03:2021)', () => {
 
-  // Chatbot Prompt Injection
+  // Chatbot Prompt Injection — https://pwning.owasp-juice.shop/companion-guide/latest/part2/injection.html#_trick_the_chatbot_into_generating_a_coupon_code_for_you
   test('Chatbot Prompt Injection: chatbot must resist system prompt leakage', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const auth = new AuthHelper(request);
@@ -50,7 +50,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
     ).not.toMatch(/system prompt|instructions|you are a|you must/i);
   });
 
-  // Christmas Special (SQLi via product search)
+  // Christmas Special — https://pwning.owasp-juice.shop/companion-guide/latest/part2/injection.html#_order_the_christmas_special_offer_of_2014
   test('Christmas Special: deleted product must not be retrievable via SQL injection', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get(
@@ -64,7 +64,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
     ).toBe(0);
   });
 
-  // Database Schema
+  // Database Schema — https://pwning.owasp-juice.shop/companion-guide/latest/part2/injection.html#_exfiltrate_the_entire_db_schema_definition_via_sql_injection
   test('Database Schema: schema exfiltration via UNION injection must be blocked', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get(
@@ -144,9 +144,11 @@ test.describe('Injection (OWASP A03:2021)', () => {
     const res = await client.get(`/rest/track-order/${payload}`);
     const body = await res.json() as { data?: unknown[] };
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // The "<= 1" check was wrong: if only 1 order exists in the DB the exploit could succeed
+    // (returning that 1 order) yet the assertion would still pass. Require exactly 0 rows.
     expect(
-      [400, 403, 404].includes(res.status()) || (body.data ?? []).length <= 1,
-      'NoSQL operator in order tracking must not return orders belonging to other users'
+      [400, 403, 404].includes(res.status()) || (body.data ?? []).length === 0,
+      'NoSQL operator in order tracking must return no rows — any rows returned indicate successful exfiltration'
     ).toBe(true);
   });
 
@@ -173,9 +175,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
     const auth = new AuthHelper(request);
     const token = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
 
-    const profileRes = await client.get('/api/Users/whoami', token);
-    const profileBody = await profileRes.json() as { data?: { id: number } };
-    const uid = profileBody.data?.id;
+    const uid = AuthHelper.getUserId(token);
     if (!uid) return;
 
     await client.put(`/api/Users/${uid}`, { username: '{{7*7}}' }, token);

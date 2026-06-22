@@ -10,7 +10,7 @@ const BASE = 'http://localhost:3000';
 
 test.describe('Security through Obscurity', () => {
 
-  // Blockchain Hype
+  // Blockchain Hype — https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-through-obscurity.html#_learn_about_the_token_sale_before_its_official_announcement
   test('Blockchain Hype: hidden blockchain integration reference must not expose private keys', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/padding/blockchain.png');
@@ -28,7 +28,7 @@ test.describe('Security through Obscurity', () => {
     }
   });
 
-  // Privacy Policy Inspection
+  // Privacy Policy Inspection — https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-through-obscurity.html#_prove_that_you_actually_read_our_privacy_policy
   test('Privacy Policy Inspection: privacy policy must not contain hidden executable content', async ({ page }) => {
     await page.goto(`${BASE}/#/privacy-security/privacy-policy`);
     await page.waitForLoadState('networkidle');
@@ -40,7 +40,7 @@ test.describe('Security through Obscurity', () => {
     ).not.toMatch(/<script[^>]*>(?!.*?<\/script>)/s);
   });
 
-  // Steganography
+  // Steganography — https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-through-obscurity.html#_rat_out_a_notorious_character_hiding_in_plain_sight_in_the_shop
   test('Steganography: product images must not expose credentials via HTTP response headers', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/products/StrawberryShake.jpg');

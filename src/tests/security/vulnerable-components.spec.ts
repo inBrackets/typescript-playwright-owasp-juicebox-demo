@@ -23,7 +23,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     adminToken = await auth.loginAsAdmin();
   });
 
-  // Arbitrary File Write
+  // Arbitrary File Write — https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_overwrite_the_legal_information_file
   test('Arbitrary File Write: path traversal in file upload must be blocked', async ({ request }) => {
     const traversalContent = Buffer.from('malicious content');
     const res = await request.post(`${BASE}/file-upload`, {
@@ -43,7 +43,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).toBe(true);
   });
 
-  // Forged Signed JWT
+  // Forged Signed JWT — https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_forge_an_almost_properly_rsa_signed_jwt_token
   test('Forged Signed JWT: RS256 token signed with the RSA public key must be rejected', async ({ request }) => {
     // "Algorithm confusion" attack: server uses RS256 but if it falls back to HS256
     // and the attacker signs with the public key, it would verify successfully.
@@ -60,7 +60,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).toBe(true);
   });
 
-  // Frontend Typosquatting
+  // Frontend Typosquatting — https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_typosquatting_imposter_that_dug_itself_deep_into_the_frontend
   test('Frontend Typosquatting: package-lock.json must not reference typosquatted packages', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');
@@ -73,7 +73,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).not.toMatch(/sequal|expres[^s]|lodahs|node-uuid-v4/i);
   });
 
-  // Legacy Typosquatting
+  // Legacy Typosquatting — https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_typosquatting_trick_it_has_been_a_victim_of
   test('Legacy Typosquatting: legacy npm package names must not be present in the dependency tree', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');
@@ -92,10 +92,12 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     const res = await client.get('/rest/track-order/..%2F..%2F..%2Fetc%2Fpasswd');
     const body = await res.text();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // The original check only looked for /bin/bash, which misses Alpine Linux Docker images
+    // that use /bin/sh or /bin/ash — both are also conclusive indicators of /etc/passwd content.
     expect(
       body,
       'Path traversal in order-tracking must not serve /etc/passwd content'
-    ).not.toMatch(/root:x:|\/bin\/bash/);
+    ).not.toMatch(/root:x:|\/bin\/(bash|sh|ash)/);
   });
 
   // Supply Chain Attack

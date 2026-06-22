@@ -23,4 +23,16 @@ export class AuthHelper {
   static uniqueEmail(): string {
     return `test-${Date.now()}@pwtest.local`;
   }
+
+  // Decodes the JWT payload (no signature verification needed — we just need the embedded id)
+  static getUserId(token: string): number | undefined {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(token.split('.')[1], 'base64url').toString()
+      ) as { data?: { id?: number } };
+      return payload.data?.id;
+    } catch {
+      return undefined;
+    }
+  }
 }

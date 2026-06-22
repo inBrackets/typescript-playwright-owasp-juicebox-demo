@@ -7,7 +7,7 @@ import { JuiceShopApiClient } from '../../helpers/api-client';
 
 test.describe('Observability Failures (OWASP A09:2021)', () => {
 
-  // Access Log
+  // Access Log — https://pwning.owasp-juice.shop/companion-guide/latest/part2/observability-failures.html#_gain_access_to_any_access_log_file_of_the_server
   test('Access Log: server access logs must not be publicly downloadable', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/support/logs');
@@ -18,7 +18,7 @@ test.describe('Observability Failures (OWASP A09:2021)', () => {
     ).toBe(true);
   });
 
-  // Exposed Metrics
+  // Exposed Metrics — https://pwning.owasp-juice.shop/companion-guide/latest/part2/observability-failures.html#_find_the_endpoint_that_serves_usage_data_to_be_scraped_by_a_popular_monitoring_system
   test('Exposed Metrics: Prometheus /metrics endpoint must not be publicly accessible', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/metrics');
@@ -29,7 +29,7 @@ test.describe('Observability Failures (OWASP A09:2021)', () => {
     ).toBe(true);
   });
 
-  // Leaked Access Logs
+  // Leaked Access Logs — https://pwning.owasp-juice.shop/companion-guide/latest/part2/observability-failures.html#_dumpster_dive_the_internet_for_a_leaked_password_and_log_in_to_the_original_user_account_it_belongs_to
   test('Leaked Access Logs: access logs must not be accessible via the FTP directory', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/');

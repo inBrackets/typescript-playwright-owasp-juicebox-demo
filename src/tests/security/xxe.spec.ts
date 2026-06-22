@@ -19,7 +19,7 @@ test.describe('XXE – XML External Entity Injection (OWASP A05:2021)', () => {
     userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // XXE Data Access
+  // XXE Data Access — https://pwning.owasp-juice.shop/companion-guide/latest/part2/xxe.html#_retrieve_the_content_of_cwindowssystem_ini_or_etcpasswd_from_the_server
   test('XXE Data Access: XML order endpoint must not resolve external entity file references', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const xxePayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -42,7 +42,7 @@ test.describe('XXE – XML External Entity Injection (OWASP A05:2021)', () => {
     ).not.toMatch(/root:x:|\/bin\/bash|nobody:x:/);
   });
 
-  // XXE DoS
+  // XXE DoS — https://pwning.owasp-juice.shop/companion-guide/latest/part2/xxe.html#_give_the_server_something_to_chew_on_for_quite_a_while
   test('XXE DoS: billion-laughs XML payload must be rejected before causing resource exhaustion', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const billionLaughs = `<?xml version="1.0" encoding="UTF-8"?>

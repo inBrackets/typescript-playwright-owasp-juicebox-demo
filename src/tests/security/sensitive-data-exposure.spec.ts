@@ -17,7 +17,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     userToken  = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // Confidential Document
+  // Confidential Document — https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_confidential_document
   test('Confidential Document: internal acquisition document must not be publicly accessible', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/acquisitions.md');
@@ -28,7 +28,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Email Leak
+  // Email Leak — https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_perform_an_unwanted_information_disclosure_by_accessing_data_cross_domain
   test('Email Leak: user list API must not expose all email addresses to non-admin', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Users/', userToken);
@@ -39,7 +39,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toBe(true);
   });
 
-  // Exposed Credentials
+  // Exposed Credentials — https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_a_developer_was_careless_with_hardcoding_unused_but_still_valid_credentials
   test('Exposed Credentials: main.js must not contain hardcoded credentials', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/main.js');
@@ -52,7 +52,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toMatch(/password\s*[:=]\s*["'][^"']{6,}/i);
   });
 
-  // Forgotten Developer Backup
+  // Forgotten Developer Backup — https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_developers_forgotten_backup_file
   test('Forgotten Developer Backup: package.json.bak must not be publicly downloadable', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');

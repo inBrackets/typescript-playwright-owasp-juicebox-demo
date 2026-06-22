@@ -19,7 +19,7 @@ test.describe('Miscellaneous', () => {
     userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // Mass Dispel
+  // Mass Dispel — https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_close_multiple_challenge_solved_notifications_in_one_go
   test('Mass Dispel: all UI overlays must be dismissible', async ({ page }) => {
     await page.goto(`${BASE}/#/`);
     await page.waitForLoadState('networkidle');
@@ -41,7 +41,7 @@ test.describe('Miscellaneous', () => {
     ).toBe(0);
   });
 
-  // Privacy Policy
+  // Privacy Policy — https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_read_our_privacy_policy
   test('Privacy Policy: privacy policy page must be accessible', async ({ page }) => {
     await page.goto(`${BASE}/#/privacy-security/privacy-policy`);
     await page.waitForLoadState('networkidle');
@@ -53,7 +53,7 @@ test.describe('Miscellaneous', () => {
     ).toContain('privacy-policy');
   });
 
-  // Score Board
+  // Score Board — https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_find_the_carefully_hidden_score_board_page
   test('Score Board: score board must be accessible at /#/score-board', async ({ page }) => {
     const scoreboard = new ScoreboardPage(page);
     await scoreboard.navigate();

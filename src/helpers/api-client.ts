@@ -11,7 +11,7 @@ export class JuiceShopApiClient {
   }
 
   async login(email: string, password: string): Promise<string> {
-    const res = await this.request.post(`${this.base}/api/Users/login`, {
+    const res = await this.request.post(`${this.base}/rest/user/login`, {
       data: { email, password },
     });
     if (!res.ok()) return '';

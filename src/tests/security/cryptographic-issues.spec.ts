@@ -18,19 +18,25 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
     adminToken = await auth.loginAsAdmin();
   });
 
-  // Forged Coupon
+  // Forged Coupon — https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_forge_a_coupon_code_that_gives_you_a_discount_of_at_least_80
+  // The coupon redemption endpoint is PUT /rest/basket/:basketId/coupon/:coupon (coupon in URL path).
+  // Calling POST /rest/basket/1/coupon/apply with body always returns 404 regardless of coupon
+  // validity — the vulnerability is never actually tested.
   test('Forged Coupon: coupon validation must reject codes not issued by the server', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const forgedCoupon = 'AAAAAAAAAAAA'; // random string unlikely to be valid
-    const res = await client.post('/rest/basket/1/coupon/apply', { coupon: forgedCoupon }, userToken);
+    const forgedCoupon = 'AAAAAAAAAAAA'; // random string not issued by the server
+    // Use admin's basket (bid=1) with admin token to ensure ownership check passes
+    // so the test exercises coupon validation, not basket access control.
+    const res = await client.put(`/rest/basket/1/coupon/${forgedCoupon}`, {}, adminToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Status 200 means a forged coupon was accepted — cryptographic validation is broken.
     expect(
       [400, 401, 404, 422].includes(res.status()),
-      'A randomly forged coupon code must be rejected'
+      'A randomly forged coupon code must be rejected by the server'
     ).toBe(true);
   });
 
-  // Imaginary Challenge
+  // Imaginary Challenge — https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_solve_challenge_999
   test('Imaginary Challenge: non-existent challenge endpoint must return 404', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/imaginary', userToken);
@@ -41,7 +47,7 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
     ).toBe(404);
   });
 
-  // Nested Easter Egg
+  // Nested Easter Egg — https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_apply_some_advanced_cryptanalysis_to_find_the_real_easter_egg
   test('Nested Easter Egg: double-encoded URL must not bypass file access controls', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     // %2500 is a double-encoded null byte (%25 = %, making %2500 = %00 after one decode)

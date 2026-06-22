@@ -19,7 +19,7 @@ function attachDialogDetector(page: Page): () => boolean {
 
 test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
 
-  // API-only XSS
+  // API-only XSS — https://pwning.owasp-juice.shop/companion-guide/latest/part2/xss.html#_perform_a_persisted_xss_attack_without_using_the_frontend_application_at_all
   test('API-only XSS: stored XSS via product description API must not execute in browser', async ({ request, page }) => {
     const auth = new AuthHelper(request);
     const adminToken = await auth.loginAsAdmin();
@@ -42,7 +42,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     await client.put('/api/Products/1', { description: 'Apple Juice' }, adminToken);
   });
 
-  // Bonus Payload
+  // Bonus Payload — https://pwning.owasp-juice.shop/companion-guide/latest/part2/xss.html#_use_the_bonus_payload_in_the_dom_xss_challenge
   test('Bonus Payload: Juice Shop bonus XSS payload must not execute via search', async ({ page }) => {
     const xssExecuted = attachDialogDetector(page);
     const main = new MainPage(page);
@@ -56,7 +56,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     ).toBe(false);
   });
 
-  // CSP Bypass
+  // CSP Bypass — https://pwning.owasp-juice.shop/companion-guide/latest/part2/xss.html#_bypass_the_content_security_policy_and_perform_an_xss_attack_on_a_legacy_page
   test('CSP Bypass: Content-Security-Policy header must be present and restrictive', async ({ page }) => {
     const response = await page.goto(`${BASE}/`);
     const csp = response?.headers()['content-security-policy'] ?? '';
@@ -71,7 +71,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     ).not.toMatch(/script-src[^;]*'unsafe-inline'(?![^;]*nonce|[^;]*sha)/);
   });
 
-  // Client-side XSS Protection
+  // Client-side XSS Protection — https://pwning.owasp-juice.shop/companion-guide/latest/part2/xss.html#_perform_a_persisted_xss_attack_bypassing_a_client_side_security_mechanism
   test('Client-side XSS Protection: search results must encode reflected HTML', async ({ page }) => {
     const xssExecuted = attachDialogDetector(page);
     const main = new MainPage(page);
@@ -112,7 +112,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     const xssPayload = `<iframe src="javascript:alert('xss-header')">`;
 
     // Login a second time with the XSS payload as the apparent IP
-    await request.post(`${BASE}/api/Users/login`, {
+    await request.post(`${BASE}/rest/user/login`, {
       data: { email, password: 'Test@1234!' },
       headers: { 'X-Forwarded-For': xssPayload },
     });
@@ -152,20 +152,21 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
 
     const xssPayload = `<iframe src="javascript:alert('xss-ssr')">`;
 
-    const captchaRes = await client.get('/api/Captchas', token);
-    const captchaBody = await captchaRes.json() as { data?: { answer: number; id: number } };
+    const captchaRes = await client.get('/rest/captcha/', token);
+    const captchaBody = await captchaRes.json() as { captchaId?: number; answer?: string };
 
     await client.post('/api/Feedbacks', {
       comment: xssPayload,
       rating: 3,
-      captchaId: captchaBody.data?.id,
-      captcha: captchaBody.data?.answer,
+      captchaId: captchaBody.captchaId,
+      captcha: captchaBody.answer,
     }, token);
 
     // Admin panel renders all feedback — visiting it triggers the stored payload
     const adminToken = await auth.loginAsAdmin();
     const xssExecuted = attachDialogDetector(page);
-    await page.evaluate((tok: string) => localStorage.setItem('token', tok), adminToken);
+    // addInitScript runs before Angular boots so the token is present on first load
+    await page.addInitScript((tok: string) => { window.localStorage.setItem('token', tok); }, adminToken);
     await page.goto(`${BASE}/#/administration`);
     await page.waitForLoadState('networkidle');
 

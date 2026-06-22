@@ -20,7 +20,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // Admin Registration
+  // Admin Registration — https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_register_as_a_user_with_administrator_privileges
   test('Admin Registration: role field in registration payload must be ignored', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const email = AuthHelper.uniqueEmail();
@@ -33,7 +33,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).not.toBe('admin');
   });
 
-  // Deluxe Fraud
+  // Deluxe Fraud — https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_obtain_a_deluxe_membership_without_paying_for_it
   test('Deluxe Fraud: deluxe membership must not be obtainable without payment', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/deluxe-membership', {
@@ -46,7 +46,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Empty User Registration
+  // Empty User Registration — https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_register_a_user_with_an_empty_email_and_password
   test('Empty User Registration: blank email must be rejected during registration', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.register('', 'Test@1234!');
@@ -58,14 +58,18 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
   });
 
   // Expired Coupon
+  // The coupon redemption endpoint is PUT /rest/basket/:basketId/coupon/:coupon (coupon in URL path).
+  // Calling POST /rest/basket/1/coupon/apply with body always returns 404 regardless of coupon
+  // validity — the vulnerability is never actually tested.
   test('Expired Coupon: expired coupon codes must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    // This is a known expired coupon from Juice Shop
-    const res = await client.post('/rest/basket/1/coupon/apply', { coupon: 'WMNSDY2019' }, userToken);
+    // Use admin's basket (bid=1) so ownership is satisfied and only coupon validity is checked.
+    const res = await client.put('/rest/basket/1/coupon/WMNSDY2019', {}, adminToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Status 200 means the expired 2019 coupon was accepted — expiry validation is broken.
     expect(
       [400, 401, 404, 422].includes(res.status()),
-      'Expired coupon must be rejected'
+      'Expired coupon WMNSDY2019 must be rejected'
     ).toBe(true);
   });
 
@@ -93,14 +97,18 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
   });
 
   // Payback Time
+  // Using userToken with BasketId=1 (admin's basket) causes the server to return 401 for
+  // basket ownership failure — the negative-quantity validation is never reached, making the
+  // test pass for the wrong reason. Use adminToken so ownership is satisfied.
   test('Payback Time: negative quantity order must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/api/BasketItems', {
       BasketId: 1,
       ProductId: 1,
       quantity: -100,
-    }, userToken);
+    }, adminToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Status 200/201 means a negative-quantity item was accepted — the Payback Time vulnerability is present.
     expect(
       [400, 422].includes(res.status()),
       'Negative product quantity must be rejected'
@@ -168,16 +176,16 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     const client = new JuiceShopApiClient(request);
 
     // First get a valid CAPTCHA
-    const captchaRes = await client.get('/api/Captchas', userToken);
-    const captchaBody = await captchaRes.json() as { data?: { answer: number; id: number } };
-    const captchaId = captchaBody.data?.id ?? 1;
-    const answer = captchaBody.data?.answer ?? 0;
+    const captchaRes = await client.get('/rest/captcha/', userToken);
+    const captchaBody = await captchaRes.json() as { captchaId?: number; answer?: string };
+    const captchaId = captchaBody.captchaId ?? 1;
+    const captcha = captchaBody.answer ?? '0';
 
     const res = await client.post('/api/Feedbacks', {
       comment: 'zero star test',
       rating: 0,
       captchaId,
-      captcha: answer,
+      captcha,
     }, userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
