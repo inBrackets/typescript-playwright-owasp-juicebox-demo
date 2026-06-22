@@ -27,27 +27,24 @@ jobs:
       actions: read   # dawidd6/action-download-artifact needs this to list prior runs
 
     # ── OWASP Juice Shop ──────────────────────────────────────────────────
-    # Health-check uses wget (busybox, always present on Alpine-based images).
-    # Avoids nested-quote escaping issues that break node -e health commands
-    # when GitHub Actions serialises the options string into docker run args.
+    # --no-healthcheck disables both the image's built-in HEALTHCHECK and any
+    # options-based health-cmd we might specify. This is intentional:
     #
-    # Start period is 60s: newer Juice Shop versions (v17+) run two external
-    # domain-reachability checks during startup (Alchemy + Ollama) before the
-    # HTTP server binds to port 3000, adding ~20s over the old 40s window.
+    # GitHub Actions splits the `options` string on whitespace without
+    # respecting shell quoting, so any --health-cmd that contains spaces
+    # (i.e. every useful command) is silently broken at the word boundary —
+    # the runner passes only the first word as the command and the rest as
+    # stray docker-run flags that are ignored.
     #
-    # GitHub Actions will not advance past this block until the container
-    # reports healthy, so no explicit sleep is needed in the steps below.
+    # Readiness is handled instead by the explicit "Wait for Juice Shop" step
+    # below, which runs curl on the GitHub Actions runner (not inside the
+    # container) and therefore has no quoting constraints.
     services:
       juice-shop:
         image: bkimminich/juice-shop:latest
         ports:
           - 3000:3000
-        options: >-
-          --health-cmd "wget -q --spider http://localhost:3000 || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 20
-          --health-start-period 60s
+        options: --no-healthcheck
 
     steps:
       # ── Source ────────────────────────────────────────────────────────
@@ -78,6 +75,25 @@ jobs:
 
       - name: Install Playwright browser binaries
         run: npx playwright install --with-deps chromium
+
+      # ── Wait for Juice Shop ────────────────────────────────────────────
+      # curl is always available on ubuntu-latest and runs on the runner,
+      # so there are no quoting or binary-availability issues.
+      # Juice Shop v17+ runs Alchemy + Ollama reachability probes at startup
+      # before binding port 3000, so we allow up to 120s (24 × 5s sleeps).
+      - name: Wait for Juice Shop to be ready
+        run: |
+          echo "Polling http://localhost:3000 until Juice Shop is ready..."
+          for i in $(seq 1 24); do
+            if curl -sf http://localhost:3000 -o /dev/null; then
+              echo "Juice Shop ready after attempt $i"
+              exit 0
+            fi
+            echo "  attempt $i/24 — not ready yet, sleeping 5s..."
+            sleep 5
+          done
+          echo "Juice Shop did not become ready within 120s"
+          exit 1
 
       # ── Test execution ─────────────────────────────────────────────────
       # continue-on-error keeps the pipeline alive so reports are always
