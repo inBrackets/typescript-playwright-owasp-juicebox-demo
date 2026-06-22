@@ -18,8 +18,10 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   test.beforeAll(async ({ request }) => {
     const auth = new AuthHelper(request);
-    adminToken = await auth.loginAsAdmin();
-    userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
+    [adminToken, userToken] = await Promise.all([
+      auth.loginAsAdmin(),
+      auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!'),
+    ]);
   });
 
   // AI Debugging — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_reveal_some_behind_the_scenes_information_on_the_chatbot_as_a_non_admin_user
@@ -55,7 +57,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
   // PUT /api/Users/:id is the endpoint — it must reject requests from untrusted origins.
   test('CSRF: cross-origin profile update must be rejected', async ({ request }) => {
     const uid = AuthHelper.getUserId(userToken);
-    if (!uid) return;
+    expect(uid, 'getUserId must decode a valid UID from userToken for the CSRF test').toBeDefined();
 
     const res = await request.put(`${BASE}/api/Users/${uid}`, {
       data: { username: 'csrf-pwned' },
@@ -99,9 +101,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     }, adminToken);
     const body = await createRes.json() as { data?: { id: number } };
 
-    // If feedback creation failed, we cannot run this test meaningfully
     const feedbackId = body.data?.id;
-    if (!feedbackId) return;
+    expect(feedbackId, 'Feedback creation must succeed before testing delete authorization').toBeDefined();
 
     const deleteRes = await client.delete(`/api/Feedbacks/${feedbackId}`, userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -131,10 +132,12 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     }, userToken);
     const body = await res.json() as { data?: { UserId: number } };
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Compound check: either the request was rejected (non-201), or the accepted response must not
+    // contain the forged UserId. This avoids a false pass when body.data is undefined on error responses.
     expect(
-      body.data?.UserId,
-      'API must not honour a caller-supplied UserId that differs from the authenticated user'
-    ).not.toBe(1);
+      res.status() !== 201 || body.data?.UserId !== 1,
+      'Forged UserId=1 must not be accepted: server must reject or sanitize the caller-supplied field'
+    ).toBe(true);
   });
 
   // Forged Review — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_post_a_product_review_as_another_user_or_edit_any_users_existing_review

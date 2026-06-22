@@ -16,8 +16,10 @@ test.describe('Insecure Deserialization (OWASP A08:2021)', () => {
 
   test.beforeAll(async ({ request }) => {
     const auth = new AuthHelper(request);
-    adminToken = await auth.loginAsAdmin();
-    userToken  = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
+    [adminToken, userToken] = await Promise.all([
+      auth.loginAsAdmin(),
+      auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!'),
+    ]);
     userId = AuthHelper.getUserId(userToken) ?? 0;
   });
 
@@ -59,7 +61,7 @@ test.describe('Insecure Deserialization (OWASP A08:2021)', () => {
   // Successful RCE DoS — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_perform_a_remote_code_execution_that_occupies_the_server_for_a_while_without_using_infinite_loops
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_perform_a_remote_code_execution_that_occupies_the_server_for_a_while_without_using_infinite_loops
   test('Successful RCE DoS: node-serialize RCE via profile image URL must be blocked', async ({ request }) => {
-    if (!userId) return;
+    expect(userId, 'userId must be non-zero to test the RCE endpoint').toBeGreaterThan(0);
     const client = new JuiceShopApiClient(request);
     const rceUrl = '_$$ND_FUNC$$_function(){require(\'child_process\').exec(\'id\')}()';
     const res = await client.put(`/api/Users/${userId}`, { profileImage: rceUrl }, userToken);

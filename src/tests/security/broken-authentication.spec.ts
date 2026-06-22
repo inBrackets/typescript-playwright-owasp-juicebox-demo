@@ -30,7 +30,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
   });
 
   // Change Bender's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
-  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
+  // Solution:                        https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
   test("Change Bender's Password: user must not change another account's password", async ({ request }) => {
     const auth = new AuthHelper(request);
     const userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
@@ -60,10 +60,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     const token = await client.login(email, password);
 
     const uid = AuthHelper.getUserId(token);
-
-    if (uid) {
-      await client.delete(`/api/Users/${uid}`, token);
-    }
+    expect(uid, 'Token must decode to a valid user ID before the account delete step').toBeDefined();
+    await client.delete(`/api/Users/${uid!}`, token);
 
     const secondLogin = await client.login(email, password);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.

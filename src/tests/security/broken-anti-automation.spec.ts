@@ -23,7 +23,8 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
     const client = new JuiceShopApiClient(request);
     const captchaRes = await client.get('/rest/captcha/', userToken);
     const captchaBody = await captchaRes.json() as { captchaId?: number; answer?: string };
-    const captchaId = captchaBody.captchaId ?? 1;
+    expect(captchaBody.captchaId, 'CAPTCHA endpoint must return a valid captchaId').toBeDefined();
+    const captchaId = captchaBody.captchaId!;
     const wrongAnswer = Number(captchaBody.answer ?? '0') + 1;
 
     const res = await client.post('/api/Feedbacks', {
@@ -63,10 +64,7 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
     const reviewsBody = await reviewsRes.json() as { data?: Array<{ _id: string }> };
     const reviews = reviewsBody.data ?? [];
 
-    if (reviews.length === 0) {
-      // No reviews seeded — cannot test this challenge
-      return;
-    }
+    expect(reviews.length, 'Product 1 must have at least one seeded review to test Multiple Likes').toBeGreaterThan(0);
 
     const reviewId = reviews[0]._id;
     const firstLike  = await client.post(`/rest/products/reviews/${reviewId}/like`, {}, userToken);
