@@ -73,13 +73,14 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // Easter Egg — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_find_the_hidden_easter_egg
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_find_the_hidden_easter_egg
-  test('Easter Egg: /ftp/eastere.gg must not be directly accessible', async ({ request }) => {
+  test('Easter Egg: null-byte bypass must not allow access to /ftp/eastere.gg', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/eastere.gg');
+    // The exploit: append %2500.md (double-encoded null byte) to bypass the .gg extension filter.
+    const res = await client.get('/ftp/eastere.gg%2500.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       res.status(),
-      'Easter egg file must not be served without a bypass'
+      'Easter egg file must not be downloadable via %2500.md null-byte bypass'
     ).not.toBe(200);
   });
 

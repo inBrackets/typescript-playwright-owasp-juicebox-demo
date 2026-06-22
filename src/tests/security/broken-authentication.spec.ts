@@ -12,10 +12,12 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_the_password_of_bjoerns_owasp_account_via_the_forgot_password_mechanism
   test("Bjoern's Favorite Pet: security question answer must not be trivially guessable", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const commonPets = ['cat', 'dog', 'fish', 'bird', 'unikitty'];
+    // The correct account is bjoern@owasp.org and the actual answer is 'Zaya' (his cat's name).
+    // The test must fail on stock Juice Shop when 'Zaya' resets the password successfully.
+    const commonPets = ['Zaya', 'zaya', 'cat', 'dog', 'unikitty'];
     const statuses = await Promise.all(commonPets.map(answer =>
       client.post('/rest/user/reset-password', {
-        email: 'bjoern.kimminich@gmail.com',
+        email: 'bjoern@owasp.org',
         answer,
         new: 'Owned@1234!',
         repeat: 'Owned@1234!',
@@ -31,22 +33,22 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Change Bender's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
   // Solution:                        https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
-  test("Change Bender's Password: user must not change another account's password", async ({ request }) => {
+  test("Change Bender's Password: password change must require current password verification", async ({ request }) => {
     const auth = new AuthHelper(request);
     const userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
     const client = new JuiceShopApiClient(request);
 
-    // Attempt to change password for userId=3 (Bender) as a different user
-    const res = await client.put('/rest/user/change-password', {
-      current: 'doesNotMatter',
-      new: 'Owned@1234!',
-      repeat: 'Owned@1234!',
-    }, userToken);
+    // Vulnerability: GET /rest/user/change-password does not validate the 'current' field.
+    // Omitting 'current' entirely should be rejected on a hardened server but accepted on vulnerable Juice Shop.
+    const res = await client.get(
+      '/rest/user/change-password?new=Owned%401234!&repeat=Owned%401234!',
+      userToken
+    );
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       res.status(),
-      'Password change must be scoped to the authenticated user only'
+      'Password change without current password must be rejected — current password verification is not enforced'
     ).not.toBe(200);
   });
 
@@ -118,18 +120,22 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Reset Bjoern's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_reset_the_password_of_bjoerns_internal_account_via_the_forgot_password_mechanism
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_the_password_of_bjoerns_internal_account_via_the_forgot_password_mechanism
-  test("Reset Bjoern's Password: email-based reset must not expose token in response", async ({ request }) => {
+  test("Reset Bjoern's Password: security question answer must not be publicly discoverable", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.post('/rest/user/forgot-password', {
-      email: 'bjoern.kimminich@gmail.com',
+    // The correct answer to bjoern@juice-sh.op's security question is 'Scala' (from Stack Overflow).
+    // On stock Juice Shop this succeeds (200) because the answer is publicly discoverable.
+    const res = await client.post('/rest/user/reset-password', {
+      email: 'bjoern@juice-sh.op',
+      answer: 'Scala',
+      new: 'NewPwd@1234!',
+      repeat: 'NewPwd@1234!',
     });
-    const body = await res.text();
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      body,
-      'Password reset response must not leak the reset token in the HTTP response body'
-    ).not.toMatch(/token|reset.*link/i);
+      res.status(),
+      "Bjoern's internal account must not be resettable with a publicly discoverable answer (Scala)"
+    ).not.toBe(200);
   });
 
   // Reset Jim's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_reset_jims_password_via_the_forgot_password_mechanism
@@ -155,13 +161,27 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Two Factor Authentication — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_solve_the_2fa_challenge_for_user_wurstbrot
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_solve_the_2fa_challenge_for_user_wurstbrot
-  test('Two Factor Authentication: 2FA setup endpoint must require authentication', async ({ request }) => {
+  test('Two Factor Authentication: invalid TOTP must not bypass 2FA for wurstbrot account', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.post('/rest/2fa/setup', { tfaToken: '000000' });
+    // Login with wurstbrot's known credentials — 2FA is enabled so the server returns a tmpToken.
+    const loginRes = await client.post('/rest/user/login', {
+      email: 'wurstbrot@juice-sh.op',
+      password: 'EhrmahGerd',
+    });
+    const loginBody = await loginRes.json() as { authentication?: { tmpToken?: string } };
+    const tmpToken = loginBody.authentication?.tmpToken;
+    expect(tmpToken, '2FA-protected login must return a tmpToken before the OTP step').toBeDefined();
+
+    // Attempt to bypass 2FA with an invalid TOTP code.
+    const verifyRes = await client.post('/rest/2fa/verify', {
+      tmpToken,
+      totp: '000000',
+    });
+
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      [401, 403].includes(res.status()),
-      '2FA setup must require an authenticated session'
+      [401, 403].includes(verifyRes.status()),
+      '2FA verify must reject an invalid TOTP — accepting any code means 2FA is broken'
     ).toBe(true);
   });
 

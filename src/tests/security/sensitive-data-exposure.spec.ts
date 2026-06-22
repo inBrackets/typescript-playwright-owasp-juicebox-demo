@@ -57,25 +57,27 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Forgotten Developer Backup — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_developers_forgotten_backup_file
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_access_a_developers_forgotten_backup_file
-  test('Forgotten Developer Backup: package.json.bak must not be publicly downloadable', async ({ request }) => {
+  test('Forgotten Developer Backup: null-byte bypass must not allow access to package.json.bak', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/package.json.bak');
+    // The exploit: append %2500.md (double-encoded null byte) to bypass the .bak extension filter.
+    const res = await client.get('/ftp/package.json.bak%2500.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       res.status(),
-      'Developer backup file must not be publicly accessible'
+      'Developer backup must not be downloadable via %2500.md null-byte bypass'
     ).not.toBe(200);
   });
 
   // Forgotten Sales Backup — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_salesmans_forgotten_backup_file
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_access_a_salesmans_forgotten_backup_file
-  test('Forgotten Sales Backup: coupons backup file must not be publicly downloadable', async ({ request }) => {
+  test('Forgotten Sales Backup: null-byte bypass must not allow access to coupons_2013.md.bak', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/coupons_2013.md.bak');
+    // The exploit: append %2500.md to bypass the .bak extension filter.
+    const res = await client.get('/ftp/coupons_2013.md.bak%2500.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       res.status(),
-      'Sales backup file must not be publicly accessible'
+      'Sales backup must not be downloadable via %2500.md null-byte bypass'
     ).not.toBe(200);
   });
 
@@ -95,37 +97,44 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Leaked API Key — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_inform_the_shop_about_a_leaked_api_key
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_shop_about_a_leaked_api_key
-  test('Leaked API Key: API keys must not appear in client-side JavaScript bundles', async ({ request }) => {
+  test('Leaked API Key: Google Maps API key must not appear in client-side JavaScript bundles', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/runtime.js');
+    // The leaked key is a Google Maps API key embedded in main.js (not runtime.js).
+    const res = await client.get('/main.js');
     if (res.status() !== 200) return;
     const body = await res.text();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Google Maps API keys match AIza[0-9A-Za-z_-]{35}.
     expect(
       body,
-      'Runtime JS bundle must not contain API key literals'
-    ).not.toMatch(/[Aa][Pp][Ii][_-]?[Kk][Ee][Yy]\s*[:=]\s*["'][^"']{16,}/);
+      'main.js must not contain a Google Maps API key (AIza pattern)'
+    ).not.toMatch(/AIza[0-9A-Za-z_-]{35}/);
   });
 
   // Leaked Unsafe Product — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_identify_an_unsafe_product_that_was_removed_from_the_shop_and_inform_the_shop_which_ingredients_are_dangerous
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_identify_an_unsafe_product_that_was_removed_from_the_shop_and_inform_the_shop_which_ingredients_are_dangerous
-  test('Leaked Unsafe Product: unsafe product must not appear in the public product list', async ({ request }) => {
+  test('Leaked Unsafe Product: SQL injection must not expose soft-deleted unsafe products', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/api/Products');
-    const body = await res.json() as { data?: Array<{ name?: string }> };
-    const products = body.data ?? [];
+    // The unsafe product is soft-deleted and absent from /api/Products.
+    // The exploit uses SQLi to retrieve rows WHERE deletedAt IS NOT NULL.
+    const res = await client.get(
+      "/rest/products/search?q='))UNION SELECT id,name,description,price,deluxePrice,image,createdAt,updatedAt,deletedAt FROM Products WHERE deletedAt IS NOT NULL--"
+    );
+    const body = await res.json() as { data?: Array<{ name?: string; description?: string }> };
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Any returned rows mean soft-deleted products are leakable via SQLi.
     expect(
-      products.some(p => /r0b0t|battery|unsafe|recall/i.test(p.name ?? '')),
-      'Recalled or unsafe product must not appear in the public product listing'
-    ).toBe(false);
+      (body.data ?? []).length,
+      'SQL injection must not return soft-deleted products — the search endpoint must use parameterized queries'
+    ).toBe(0);
   });
 
   // Login Amy — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_log_in_with_amys_original_user_credentials
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_log_in_with_amys_original_user_credentials
   test('Login Amy: Amy\'s password must not be trivially guessable', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const guesses = ['K1f...', 'K1f', 'password'];
+    // Amy's actual password is 'K1f.....................' (K1f followed by 23 dots).
+    const guesses = ['K1f.....................', 'K1f......................', 'K1f...', 'K1f', 'password'];
     const tokens  = await Promise.all(guesses.map(pw => client.login('amy@juice-sh.op', pw)));
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -138,7 +147,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_log_in_with_mc_safesearchs_original_user_credentials
   test('Login MC SafeSearch: MC SafeSearch password must not be derivable from public information', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const guesses = ['Mr. Noodles', 'mrnoodles', 'noodles'];
+    // The correct password is 'Mr. N00dles' (zeros instead of letter O) — from a song lyric hint.
+    const guesses = ['Mr. N00dles', 'Mr. Noodles', 'mrnoodles', 'noodles'];
     const tokens  = await Promise.all(guesses.map(pw => client.login('mc.safesearch@juice-sh.op', pw)));
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -149,17 +159,20 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Meta Geo Stalking — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_determine_the_answer_to_johns_security_question
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_determine_the_answer_to_johns_security_question
-  test('Meta Geo Stalking: photo metadata must not expose precise geolocation', async ({ request }) => {
+  test('Meta Geo Stalking: security answer derivable from photo EXIF must not reset password', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/assets/public/images/uploads/favorite-hiking-place.png');
-    if (res.status() !== 200) return;
-    // Minimal check: the image must be served as an image, not as JSON with coordinates
-    const contentType = res.headers()['content-type'] ?? '';
+    // The EXIF GPS data in the hiking photo reveals 'Daniel Boone National Forest' — John's security answer.
+    const res = await client.post('/rest/user/reset-password', {
+      email: 'john@juice-sh.op',
+      answer: 'Daniel Boone National Forest',
+      new: 'NewPwd@1234!',
+      repeat: 'NewPwd@1234!',
+    });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      contentType,
-      'Hiking image endpoint must serve an image, not a JSON payload with geolocation'
-    ).toMatch(/image\//);
+      res.status(),
+      "John's password must not be resettable with a location derived from photo EXIF metadata"
+    ).not.toBe(200);
   });
 
   // NFT Takeover — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_take_over_the_wallet_containing_our_official_soul_bound_token
@@ -176,24 +189,27 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Password Hash Leak — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html
-  test('Password Hash Leak: password hashes must not be exposed via the user API', async ({ request }) => {
+  test('Password Hash Leak: password hashes must not be retrievable via SQL injection', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/api/Users/', adminToken);
-    if (res.status() !== 200) return;
-    const body = await res.json() as { data?: Array<{ password?: string }> };
-    const users = body.data ?? [];
+    // /api/Users/ strips the password field. The actual leak requires SQLi on the search endpoint.
+    const res = await client.get(
+      "/rest/products/search?q=qwert'))UNION SELECT id,email,password,'4','5','6','7','8','9' FROM Users--"
+    );
+    const body = await res.json() as { data?: unknown[] };
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Any rows returned means SQLi succeeded and password hashes are exposed.
     expect(
-      users.every(u => !u.password || u.password === ''),
-      'Password field must be omitted or empty in the user list API response'
-    ).toBe(true);
+      (body.data ?? []).length,
+      'Password hashes must not be retrievable via UNION injection — parameterized queries must be enforced'
+    ).toBe(0);
   });
 
   // Reset Uvogin's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_reset_uvogins_password_via_the_forgot_password_mechanism
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_uvogins_password_via_the_forgot_password_mechanism
   test("Reset Uvogin's Password: security answer must not be obtainable from public social media", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const guesses = ['Mr. Noodles', 'Squeaky', 'uvogin'];
+    // 'Silence of the Lambs' is the correct answer — derivable from Uvogin's public social media.
+    const guesses = ['Silence of the Lambs', 'Mr. Noodles', 'Squeaky', 'uvogin'];
     const statuses = await Promise.all(guesses.map(answer =>
       client.post('/rest/user/reset-password', {
         email: 'uvogin@juice-sh.op',
@@ -223,16 +239,20 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Visual Geo Stalking — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_determine_the_answer_to_emmas_security_question
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_determine_the_answer_to_emmas_security_question
-  test('Visual Geo Stalking: profile photo must not expose identifiable location metadata', async ({ request }) => {
+  test('Visual Geo Stalking: security answer derivable from profile photo must not reset password', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/assets/public/images/uploads/IMG_4253.jpg');
-    if (res.status() !== 200) return;
-    const contentType = res.headers()['content-type'] ?? '';
+    // The background in Emma's profile photo visually identifies 'ITsec GmbH' — her security answer.
+    const res = await client.post('/rest/user/reset-password', {
+      email: 'emma@juice-sh.op',
+      answer: 'ITsec GmbH',
+      new: 'NewPwd@1234!',
+      repeat: 'NewPwd@1234!',
+    });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      contentType,
-      'Geo-stalking image must be served as an image type, not as a data-exposing endpoint'
-    ).toMatch(/image\//);
+      res.status(),
+      "Emma's password must not be resettable with a company name visible in her profile photo"
+    ).not.toBe(200);
   });
 
 });

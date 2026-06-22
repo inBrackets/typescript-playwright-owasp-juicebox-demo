@@ -19,25 +19,36 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
 
   // CAPTCHA Bypass — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-anti-automation.html#_submit_10_or_more_customer_feedbacks_within_20_seconds
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_submit_10_or_more_customer_feedbacks_within_20_seconds
-  test('CAPTCHA Bypass: feedback endpoint must enforce CAPTCHA validation', async ({ request }) => {
+  test('CAPTCHA Bypass: feedback endpoint must reject captchaId reuse across multiple submissions', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
+    // Solve CAPTCHA once with a correct answer, then reuse the same captchaId 10 times.
+    // Vulnerability: the server never invalidates captchaId after first use, allowing automation.
     const captchaRes = await client.get('/rest/captcha/', userToken);
     const captchaBody = await captchaRes.json() as { captchaId?: number; answer?: string };
     expect(captchaBody.captchaId, 'CAPTCHA endpoint must return a valid captchaId').toBeDefined();
     const captchaId = captchaBody.captchaId!;
-    const wrongAnswer = Number(captchaBody.answer ?? '0') + 1;
+    const correctAnswer = captchaBody.answer!;
 
-    const res = await client.post('/api/Feedbacks', {
-      comment: 'captcha-bypass-test',
-      rating: 3,
-      captchaId,
-      captcha: wrongAnswer,
-    }, userToken);
+    const SUBMISSIONS = 10;
+    const statuses = await Promise.all(
+      Array.from({ length: SUBMISSIONS }, (_, i) =>
+        client.post('/api/Feedbacks', {
+          comment: `captcha-reuse-test-${i}`,
+          rating: 3,
+          captchaId,
+          captcha: correctAnswer,
+        }, userToken).then(res => res.status())
+      )
+    );
+
+    const acceptedCount = statuses.filter(s => s === 201).length;
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // On a hardened server captchaId is invalidated after first use — only 1 can succeed.
+    // More than 1 success means CAPTCHA bypass is possible.
     expect(
-      res.status(),
-      'Feedback with wrong CAPTCHA answer must be rejected'
-    ).not.toBe(201);
+      acceptedCount <= 1,
+      `CAPTCHA bypass detected: ${acceptedCount} of ${SUBMISSIONS} submissions accepted with the same captchaId`
+    ).toBe(true);
   });
 
   // Extra Language — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-anti-automation.html#_retrieve_the_language_file_that_never_made_it_into_production
@@ -82,7 +93,8 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_mortys_password_via_the_forgot_password_mechanism
   test("Reset Morty's Password: security question brute-force must be rate-limited", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const attempts = ['cat', 'dog', 'fish', 'bird', 'hamster'];
+    // '5N0wb4ll' is Morty's cat's name — the correct answer per the companion guide.
+    const attempts = ['5N0wb4ll', 'Snowball', 'cat', 'dog', 'hamster'];
     const statuses = await Promise.all(attempts.map(answer =>
       client.post('/rest/user/reset-password', {
         email: 'morty@juice-sh.op',

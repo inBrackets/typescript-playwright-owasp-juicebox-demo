@@ -25,15 +25,15 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
   // validity — the vulnerability is never actually tested.
   test('Forged Coupon: coupon validation must reject codes not issued by the server', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const forgedCoupon = 'AAAAAAAAAAAA'; // random string not issued by the server
-    // Use admin's basket (bid=1) with admin token to ensure ownership check passes
-    // so the test exercises coupon validation, not basket access control.
-    const res = await client.put(`/rest/basket/1/coupon/${forgedCoupon}`, {}, adminToken);
+    // n<5U!< is a z85-encoded forged coupon granting 80%+ discount that was never officially issued.
+    // The coupon redemption endpoint is GET /rest/basket/:id/coupon/:coupon (not PUT).
+    const forgedCoupon = 'n<5U!<';
+    const res = await client.get(`/rest/basket/1/coupon/${forgedCoupon}`, adminToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     // Status 200 means a forged coupon was accepted — cryptographic validation is broken.
     expect(
       [400, 401, 404, 422].includes(res.status()),
-      'A randomly forged coupon code must be rejected by the server'
+      'A forged z85-encoded coupon must be rejected — cryptographic coupon validation is broken'
     ).toBe(true);
   });
 
@@ -64,15 +64,16 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
 
   // Premium Paywall — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_unlock_premium_challenge_to_access_exclusive_content
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_unlock_premium_challenge_to_access_exclusive_content
-  test('Premium Paywall: premium content must not be accessible without a valid subscription', async ({ request }) => {
+  test('Premium Paywall: deluxe membership must not be obtainable without valid payment', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/rest/deluxe-membership', userToken);
-    const body = await res.json() as { status?: string };
+    // The bypass: submit an empty paymentMode — vulnerable server grants membership without charging.
+    const res = await client.post('/rest/deluxe-membership', { paymentMode: '' }, userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // A 200 response means deluxe membership was granted with no valid payment.
     expect(
-      body.status,
-      'Free user must not have deluxe membership status'
-    ).not.toBe('active');
+      res.status(),
+      'Deluxe membership must not be grantable with an empty or invalid payment mode'
+    ).not.toBe(200);
   });
 
   // Weird Crypto — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_inform_the_shop_about_an_algorithm_or_library_it_should_definitely_not_use_the_way_it_does
@@ -80,19 +81,19 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
   test('Weird Crypto: password hashes must not use MD5 or other deprecated algorithms', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
 
-    const res = await client.get('/api/Users/', adminToken);
-    if (res.status() !== 200) {
-      // If endpoint is inaccessible, the test is informational
-      return;
-    }
-    const body = await res.json() as { data?: Array<{ password?: string }> };
-    const users = body.data ?? [];
+    // /api/Users/ strips the password field for privacy. Use SQLi to retrieve hashes directly.
+    const res = await client.get(
+      "/rest/products/search?q=qwert'))UNION SELECT id,email,password,'4','5','6','7','8','9' FROM Users--"
+    );
+    const body = await res.json() as { data?: Array<{ description?: string }> };
+    const rows = body.data ?? [];
     const md5Pattern = /^[a-f0-9]{32}$/;
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // The SQLi itself succeeding is already a vulnerability; additionally, MD5 hashes expose the algorithm.
     expect(
-      users.some(u => u.password && md5Pattern.test(u.password)),
-      'No user password hash should match the MD5 hex pattern (32 hex chars)'
+      rows.some(r => r.description && md5Pattern.test(r.description)),
+      'Password hashes returned via SQLi must not be MD5 (32 hex chars) — a stronger algorithm must be used'
     ).toBe(false);
   });
 
