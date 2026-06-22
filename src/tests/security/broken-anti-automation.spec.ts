@@ -19,7 +19,7 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
 
   // CAPTCHA Bypass
   test('CAPTCHA Bypass: feedback endpoint must enforce CAPTCHA validation', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const captchaRes = await client.get('/api/Captchas', userToken);
     const captchaBody = await captchaRes.json() as { data?: { answer: number; id: number } };
     const answer = captchaBody.data?.answer ?? 0;
@@ -50,7 +50,7 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
 
   // Multiple Likes
   test('Multiple Likes: same user must not like a review more than once', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
 
     const firstLike  = await client.post('/rest/products/1/reviews/like', {}, userToken);
     const secondLike = await client.post('/rest/products/1/reviews/like', {}, userToken);
@@ -64,19 +64,16 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
 
   // Reset Morty's Password
   test("Reset Morty's Password: security question brute-force must be rate-limited", async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const attempts = ['cat', 'dog', 'fish', 'bird', 'hamster'];
-    const statuses: number[] = [];
-
-    for (const answer of attempts) {
-      const res = await client.post('/rest/user/reset-password', {
+    const statuses = await Promise.all(attempts.map(answer =>
+      client.post('/rest/user/reset-password', {
         email: 'morty@juice-sh.op',
         answer,
         new: 'NewPwd@1234!',
         repeat: 'NewPwd@1234!',
-      });
-      statuses.push(res.status());
-    }
+      }).then(res => res.status())
+    ));
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(

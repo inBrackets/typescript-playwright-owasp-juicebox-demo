@@ -6,19 +6,17 @@ import { AuthHelper } from '../../helpers/auth.helper';
 // Verifies that the application does not expose internal error details,
 // deprecated interfaces, or admin accounts with known credentials.
 
-const BASE = 'http://localhost:3000';
-
 test.describe('Security Misconfiguration (OWASP A05:2021)', () => {
 
   // Cross-Site Imaging
   test('Cross-Site Imaging: product images must not be served from untrusted cross-origin sources', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Products');
     const body = await res.json() as { data?: Array<{ image?: string }> };
     const products = body.data ?? [];
 
     const crossOriginImages = products.filter(p =>
-      p.image && p.image.startsWith('http') && !p.image.startsWith(BASE)
+      p.image && p.image.startsWith('http') && !p.image.startsWith('http://localhost:3000')
     );
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -29,7 +27,7 @@ test.describe('Security Misconfiguration (OWASP A05:2021)', () => {
 
   // Deprecated Interface
   test('Deprecated Interface: legacy B2B API endpoint must be disabled', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/b2b/v2/orders');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -40,7 +38,7 @@ test.describe('Security Misconfiguration (OWASP A05:2021)', () => {
 
   // Error Handling
   test('Error Handling: invalid routes must not expose stack traces', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/this-does-not-exist-at-all');
     const body = await res.text();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -52,7 +50,7 @@ test.describe('Security Misconfiguration (OWASP A05:2021)', () => {
 
   // Login Support Team
   test('Login Support Team: support team account must not use easily guessable credentials', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const weakPasswords = ['support', 'J6aVjTgOpRs@?5l!Zkq2AYnCE@RF$P'];
     const tokens: string[] = [];
 

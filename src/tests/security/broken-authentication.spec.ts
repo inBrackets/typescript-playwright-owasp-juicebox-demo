@@ -6,25 +6,20 @@ import { AuthHelper } from '../../helpers/auth.helper';
 // Verifies that account takeover via weak passwords, insecure password reset,
 // OAuth bypass, and 2FA weaknesses are not exploitable.
 
-const BASE = 'http://localhost:3000';
-
 test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Bjoern's Favorite Pet
   test("Bjoern's Favorite Pet: security question answer must not be trivially guessable", async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const commonPets = ['cat', 'dog', 'fish', 'bird', 'unikitty'];
-    const statuses: number[] = [];
-
-    for (const answer of commonPets) {
-      const res = await client.post('/rest/user/reset-password', {
+    const statuses = await Promise.all(commonPets.map(answer =>
+      client.post('/rest/user/reset-password', {
         email: 'bjoern.kimminich@gmail.com',
         answer,
         new: 'Owned@1234!',
         repeat: 'Owned@1234!',
-      });
-      statuses.push(res.status());
-    }
+      }).then(res => res.status())
+    ));
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -37,7 +32,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
   test("Change Bender's Password: user must not change another account's password", async ({ request }) => {
     const auth = new AuthHelper(request);
     const userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
 
     // Attempt to change password for userId=3 (Bender) as a different user
     const res = await client.put('/rest/user/change-password', {
@@ -55,7 +50,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // GDPR Data Erasure
   test('GDPR Data Erasure: deleted user account must not be usable for login', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const email = AuthHelper.uniqueEmail();
     const password = 'Test@1234!';
     await client.register(email, password);
@@ -79,7 +74,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Login Bjoern (OAuth bypass)
   test('Login Bjoern: cannot login as bjoern via direct password auth (requires OAuth)', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const token = await client.login('bjoern.kimminich@gmail.com', 'bjoern');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -90,7 +85,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Password Strength
   test('Password Strength: admin account must not use the default weak password', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const token = await client.login('admin@juice-sh.op', 'admin123');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -101,19 +96,16 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Reset Bender's Password
   test("Reset Bender's Password: reset answer must not be publicly discoverable", async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const guesses = ['Stop\'n\'Drop', 'samepassword', 'OwnedPassword'];
-    const statuses: number[] = [];
-
-    for (const answer of guesses) {
-      const res = await client.post('/rest/user/reset-password', {
+    const statuses = await Promise.all(guesses.map(answer =>
+      client.post('/rest/user/reset-password', {
         email: 'bender@juice-sh.op',
         answer,
         new: 'NewPwd@1234!',
         repeat: 'NewPwd@1234!',
-      });
-      statuses.push(res.status());
-    }
+      }).then(res => res.status())
+    ));
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -124,7 +116,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Reset Bjoern's Password
   test("Reset Bjoern's Password: email-based reset must not expose token in response", async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/user/forgot-password', {
       email: 'bjoern.kimminich@gmail.com',
     });
@@ -139,19 +131,16 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Reset Jim's Password
   test("Reset Jim's Password: security question answer must not be publicly discoverable", async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const guesses = ['Samuel', 'James', 'Peter', 'Michael'];
-    const statuses: number[] = [];
-
-    for (const answer of guesses) {
-      const res = await client.post('/rest/user/reset-password', {
+    const statuses = await Promise.all(guesses.map(answer =>
+      client.post('/rest/user/reset-password', {
         email: 'jim@juice-sh.op',
         answer,
         new: 'NewPwd@1234!',
         repeat: 'NewPwd@1234!',
-      });
-      statuses.push(res.status());
-    }
+      }).then(res => res.status())
+    ));
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -162,7 +151,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
   // Two Factor Authentication
   test('Two Factor Authentication: 2FA setup endpoint must require authentication', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/2fa/setup', { tfaToken: '000000' });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(

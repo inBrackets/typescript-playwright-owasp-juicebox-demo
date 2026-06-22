@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { JuiceShopApiClient } from '../../helpers/api-client';
 import { AuthHelper } from '../../helpers/auth.helper';
-import * as path from 'path';
-import * as fs from 'fs';
 
 // OWASP A03:2021 – Injection / Input Validation
 // Verifies that all user-supplied inputs are validated server-side:
@@ -24,7 +22,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Admin Registration
   test('Admin Registration: role field in registration payload must be ignored', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const email = AuthHelper.uniqueEmail();
     const res = await client.register(email, 'Test@1234!', { role: 'admin' });
     const body = await res.json() as { data?: { role?: string } };
@@ -37,7 +35,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Deluxe Fraud
   test('Deluxe Fraud: deluxe membership must not be obtainable without payment', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/deluxe-membership', {
       paymentMode: 'credit card',
     }, userToken);
@@ -50,7 +48,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Empty User Registration
   test('Empty User Registration: blank email must be rejected during registration', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.register('', 'Test@1234!');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -61,7 +59,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Expired Coupon
   test('Expired Coupon: expired coupon codes must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     // This is a known expired coupon from Juice Shop
     const res = await client.post('/rest/basket/1/coupon/apply', { coupon: 'WMNSDY2019' }, userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -73,7 +71,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Mint the Honey Pot
   test('Mint the Honey Pot: NFT minting must require valid authentication', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/nftMint', { nftId: 1 });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -96,7 +94,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Payback Time
   test('Payback Time: negative quantity order must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/api/BasketItems', {
       BasketId: 1,
       ProductId: 1,
@@ -111,7 +109,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Poison Null Byte
   test('Poison Null Byte: null-byte-encoded path must not bypass FTP extension filter', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/eastere.gg%00.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -122,7 +120,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Repetitive Registration
   test('Repetitive Registration: duplicate email registration must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const email = AuthHelper.uniqueEmail();
     await client.register(email, 'Test@1234!');
     const secondRes = await client.register(email, 'Test@1234!');
@@ -135,18 +133,14 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Upload Size
   test('Upload Size: oversized file upload must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     // Create an in-memory 110 kB buffer (exceeds typical 100 kB limit)
     const bigContent = Buffer.alloc(110 * 1024, 'A');
-    const tmpPath = path.join(process.cwd(), 'test-results', `oversized-${Date.now()}.pdf`);
-    fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
-    fs.writeFileSync(tmpPath, bigContent);
 
     const res = await request.post(`${BASE}/file-upload`, {
       headers: { Authorization: `Bearer ${userToken}` },
       multipart: { file: { name: 'oversized.pdf', mimeType: 'application/pdf', buffer: bigContent } },
     });
-    fs.unlinkSync(tmpPath);
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -171,7 +165,7 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Zero Stars
   test('Zero Stars: zero-star feedback rating must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
 
     // First get a valid CAPTCHA
     const captchaRes = await client.get('/api/Captchas', userToken);

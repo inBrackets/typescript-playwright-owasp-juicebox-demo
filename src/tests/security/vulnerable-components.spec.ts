@@ -51,7 +51,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
       { alg: 'HS256', typ: 'JWT' },
       { sub: '1', email: 'admin@juice-sh.op', role: 'admin', iat: Math.floor(Date.now() / 1000) }
     );
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Users/', forgedToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -62,7 +62,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
 
   // Frontend Typosquatting
   test('Frontend Typosquatting: package-lock.json must not reference typosquatted packages', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');
     if (res.status() !== 200) return; // file not accessible — pass
     const body = await res.text();
@@ -75,7 +75,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
 
   // Legacy Typosquatting
   test('Legacy Typosquatting: legacy npm package names must not be present in the dependency tree', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');
     if (res.status() !== 200) return;
     const body = await res.text();
@@ -88,7 +88,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
 
   // Local File Read
   test('Local File Read: path traversal in order tracking must not expose /etc/passwd', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/track-order/..%2F..%2F..%2Fetc%2Fpasswd');
     const body = await res.text();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -126,7 +126,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
       { alg: 'none', typ: 'JWT' },
       { sub: '1', email: 'admin@juice-sh.op', role: 'admin', iat: Math.floor(Date.now() / 1000) }
     );
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Users/', unsignedToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -139,7 +139,7 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
   // The chatbot relies on a third-party library whose status/control endpoint
   // must not be accessible to unauthenticated or non-admin callers.
   test('Kill Chatbot: chatbot disable endpoint must require admin authentication', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
 
     // Attempt to toggle chatbot off without auth
     const resUnauth = await client.post('/rest/chatbot/status', { status: false });

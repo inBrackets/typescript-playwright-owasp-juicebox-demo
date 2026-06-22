@@ -6,8 +6,6 @@ import { AuthHelper } from '../../helpers/auth.helper';
 // Verifies that confidential documents, backup files, password hashes,
 // API keys, and personal data are not inadvertently exposed.
 
-const BASE = 'http://localhost:3000';
-
 test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   let adminToken: string;
@@ -21,7 +19,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Confidential Document
   test('Confidential Document: internal acquisition document must not be publicly accessible', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/acquisitions.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -32,7 +30,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Email Leak
   test('Email Leak: user list API must not expose all email addresses to non-admin', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Users/', userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -43,7 +41,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Exposed Credentials
   test('Exposed Credentials: main.js must not contain hardcoded credentials', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/main.js');
     if (res.status() !== 200) return;
     const body = await res.text();
@@ -56,7 +54,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Forgotten Developer Backup
   test('Forgotten Developer Backup: package.json.bak must not be publicly downloadable', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -67,7 +65,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Forgotten Sales Backup
   test('Forgotten Sales Backup: coupons backup file must not be publicly downloadable', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/coupons_2013.md.bak');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -78,7 +76,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // GDPR Data Theft
   test('GDPR Data Theft: user must not download another user\'s GDPR data export', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     // Attempt to download GDPR export for userId=1 (admin) as a regular user
     const res = await client.get('/rest/user/data-export', userToken);
     const body = await res.json() as { userData?: { email?: string } };
@@ -91,7 +89,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Leaked API Key
   test('Leaked API Key: API keys must not appear in client-side JavaScript bundles', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/runtime.js');
     if (res.status() !== 200) return;
     const body = await res.text();
@@ -104,7 +102,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Leaked Unsafe Product
   test('Leaked Unsafe Product: unsafe product must not appear in the public product list', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Products');
     const body = await res.json() as { data?: Array<{ name?: string }> };
     const products = body.data ?? [];
@@ -117,7 +115,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Login Amy
   test('Login Amy: Amy\'s password must not be trivially guessable', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const guesses = ['K1f...', 'K1f', 'password'];
     const tokens  = await Promise.all(guesses.map(pw => client.login('amy@juice-sh.op', pw)));
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -129,7 +127,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Login MC SafeSearch
   test('Login MC SafeSearch: MC SafeSearch password must not be derivable from public information', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const guesses = ['Mr. Noodles', 'mrnoodles', 'noodles'];
     const tokens  = await Promise.all(guesses.map(pw => client.login('mc.safesearch@juice-sh.op', pw)));
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -141,7 +139,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Meta Geo Stalking
   test('Meta Geo Stalking: photo metadata must not expose precise geolocation', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/uploads/favorite-hiking-place.png');
     if (res.status() !== 200) return;
     // Minimal check: the image must be served as an image, not as JSON with coordinates
@@ -155,7 +153,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // NFT Takeover
   test('NFT Takeover: NFT ownership transfer must require wallet authentication', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/nftMint', { nftId: 1 });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -166,7 +164,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Password Hash Leak
   test('Password Hash Leak: password hashes must not be exposed via the user API', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Users/', adminToken);
     if (res.status() !== 200) return;
     const body = await res.json() as { data?: Array<{ password?: string }> };
@@ -180,19 +178,16 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Reset Uvogin's Password
   test("Reset Uvogin's Password: security answer must not be obtainable from public social media", async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const guesses = ['Mr. Noodles', 'Squeaky', 'uvogin'];
-    const statuses: number[] = [];
-
-    for (const answer of guesses) {
-      const res = await client.post('/rest/user/reset-password', {
+    const statuses = await Promise.all(guesses.map(answer =>
+      client.post('/rest/user/reset-password', {
         email: 'uvogin@juice-sh.op',
         answer,
         new: 'NewPwd@1234!',
         repeat: 'NewPwd@1234!',
-      });
-      statuses.push(res.status());
-    }
+      }).then(res => res.status())
+    ));
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       statuses.some(s => s === 200),
@@ -202,7 +197,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Retrieve Blueprint
   test('Retrieve Blueprint: product blueprint file must not be publicly downloadable', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/products/JuiceShop.stl');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -213,7 +208,7 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
 
   // Visual Geo Stalking
   test('Visual Geo Stalking: profile photo must not expose identifiable location metadata', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/uploads/IMG_4253.jpg');
     if (res.status() !== 200) return;
     const contentType = res.headers()['content-type'] ?? '';

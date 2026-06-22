@@ -7,20 +7,20 @@ import { AuthHelper } from '../../helpers/auth.helper';
 // algorithms are not in production use, and that paywalled content
 // cannot be bypassed via cryptographic manipulation.
 
-const BASE = 'http://localhost:3000';
-
 test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
 
   let userToken: string;
+  let adminToken: string;
 
   test.beforeAll(async ({ request }) => {
     const auth = new AuthHelper(request);
-    userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
+    userToken  = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
+    adminToken = await auth.loginAsAdmin();
   });
 
   // Forged Coupon
   test('Forged Coupon: coupon validation must reject codes not issued by the server', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const forgedCoupon = 'AAAAAAAAAAAA'; // random string unlikely to be valid
     const res = await client.post('/rest/basket/1/coupon/apply', { coupon: forgedCoupon }, userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -32,7 +32,7 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
 
   // Imaginary Challenge
   test('Imaginary Challenge: non-existent challenge endpoint must return 404', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/imaginary', userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -43,7 +43,7 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
 
   // Nested Easter Egg
   test('Nested Easter Egg: double-encoded URL must not bypass file access controls', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     // %2500 is a double-encoded null byte (%25 = %, making %2500 = %00 after one decode)
     const res = await client.get('/ftp/eastere.gg%2500.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -55,7 +55,7 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
 
   // Premium Paywall
   test('Premium Paywall: premium content must not be accessible without a valid subscription', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/deluxe-membership', userToken);
     const body = await res.json() as { status?: string };
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -67,9 +67,7 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
 
   // Weird Crypto
   test('Weird Crypto: password hashes must not use MD5 or other deprecated algorithms', async ({ request }) => {
-    const auth = new AuthHelper(request);
-    const adminToken = await auth.loginAsAdmin();
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
 
     const res = await client.get('/api/Users/', adminToken);
     if (res.status() !== 200) {

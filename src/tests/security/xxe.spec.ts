@@ -10,8 +10,6 @@ import { AuthHelper } from '../../helpers/auth.helper';
 // unavailable when Juice Shop runs in Docker (segfault from aggressive XML parsing).
 // These tests assert the BLOCKED state; against a hardened deployment both must pass.
 
-const BASE = 'http://localhost:3000';
-
 test.describe('XXE – XML External Entity Injection (OWASP A05:2021)', () => {
 
   let userToken: string;
@@ -23,7 +21,7 @@ test.describe('XXE – XML External Entity Injection (OWASP A05:2021)', () => {
 
   // XXE Data Access
   test('XXE Data Access: XML order endpoint must not resolve external entity file references', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const xxePayload = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
 <batchRequest>
@@ -46,7 +44,7 @@ test.describe('XXE – XML External Entity Injection (OWASP A05:2021)', () => {
 
   // XXE DoS
   test('XXE DoS: billion-laughs XML payload must be rejected before causing resource exhaustion', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const billionLaughs = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE lolz [
   <!ENTITY lol "lol">

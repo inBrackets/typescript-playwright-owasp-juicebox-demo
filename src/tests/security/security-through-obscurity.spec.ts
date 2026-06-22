@@ -12,7 +12,7 @@ test.describe('Security through Obscurity', () => {
 
   // Blockchain Hype
   test('Blockchain Hype: hidden blockchain integration reference must not expose private keys', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/padding/blockchain.png');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -42,7 +42,7 @@ test.describe('Security through Obscurity', () => {
 
   // Steganography
   test('Steganography: product images must not expose credentials via HTTP response headers', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/products/StrawberryShake.jpg');
     const headers = res.headers();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.

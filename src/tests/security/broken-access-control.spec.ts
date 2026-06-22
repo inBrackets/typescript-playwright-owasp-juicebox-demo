@@ -22,7 +22,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     adminToken = await auth.loginAsAdmin();
 
     const email = AuthHelper.uniqueEmail();
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     await client.register(email, 'Test@1234!');
     userToken = await client.login(email, 'Test@1234!');
 
@@ -33,7 +33,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // AI Debugging
   test('AI Debugging: AI debug endpoint must require admin auth', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/chatbot/status', userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -57,7 +57,6 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // CSRF
   test('CSRF: state-changing requests must reject missing origin', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
     const res = await request.post(`${BASE}/api/Feedbacks`, {
       data: { comment: 'csrf-test', rating: 3 },
       headers: { Authorization: `Bearer ${userToken}`, Origin: 'https://evil.com' },
@@ -71,7 +70,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // Easter Egg
   test('Easter Egg: /ftp/eastere.gg must not be directly accessible', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/eastere.gg');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -82,7 +81,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // Five-Star Feedback
   test('Five-Star Feedback: only admin can delete feedback', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const createRes = await client.post('/api/Feedbacks', { comment: 'bac-test', rating: 5 }, adminToken);
     const body = await createRes.json() as { data?: { id: number } };
     const feedbackId = body.data?.id ?? 1;
@@ -97,7 +96,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // Forged Feedback
   test('Forged Feedback: posting feedback on behalf of another user must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/api/Feedbacks', {
       comment: 'forged',
       rating: 1,
@@ -113,7 +112,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // Forged Review
   test('Forged Review: editing another user\'s review must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.patch('/rest/products/1/reviews', {
       id: 'r0000000000000000000001',
       message: 'forged review',
@@ -127,7 +126,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // Manipulate Basket
   test('Manipulate Basket: adding to another user\'s basket must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/api/BasketItems', {
       BasketId: 1,
       ProductId: 1,
@@ -142,7 +141,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // Product Tampering
   test('Product Tampering: non-admin must not modify product descriptions', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.put('/api/Products/1', {
       description: '<script>alert(1)</script>',
     }, userToken);
@@ -167,7 +166,7 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // View Basket
   test('View Basket: user must not read another user\'s basket', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     // Basket 1 is typically admin's; attempt access as normal user
     const res = await client.get('/api/Baskets/1', userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.

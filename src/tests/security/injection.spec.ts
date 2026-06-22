@@ -9,8 +9,7 @@ import { LoginPage } from '../../pages/login.page';
 // A passing test means the injection was blocked; a failing test means
 // the application is exploitable.
 
-const BASE        = 'http://localhost:3000';
-const DUMMY_PASS  = 'IrrelevantPassword1!';
+const DUMMY_PASS = 'IrrelevantPassword1!';
 
 async function assertLoginBlocked(page: Page, email: string, password: string): Promise<void> {
   const loginPage = new LoginPage(page);
@@ -34,7 +33,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // Chatbot Prompt Injection
   test('Chatbot Prompt Injection: chatbot must resist system prompt leakage', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const auth = new AuthHelper(request);
     const token = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
 
@@ -53,7 +52,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // Christmas Special (SQLi via product search)
   test('Christmas Special: deleted product must not be retrievable via SQL injection', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get(
       "/api/Products?q='))UNION SELECT id,name,description,price,deluxePrice,image,createdAt,updatedAt,deletedAt FROM Products WHERE deletedAt IS NOT NULL--"
     );
@@ -67,7 +66,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // Database Schema
   test('Database Schema: schema exfiltration via UNION injection must be blocked', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get(
       "/api/Products?q='))UNION SELECT sql,2,3,4,5,6,7,8,9 FROM sqlite_master--"
     );
@@ -90,7 +89,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // Greedy Chatbot Manipulation
   test('Greedy Chatbot Manipulation: chatbot must not grant unauthorised discounts', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const auth = new AuthHelper(request);
     const token = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
 
@@ -124,7 +123,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // NoSQL DoS
   test('NoSQL DoS: $where sleep operator in product search must be rejected or return in under 2 s', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     // NeDB (used for product reviews/search) evaluates MongoDB-style $where with JS sleep()
     const payload = encodeURIComponent(JSON.stringify({ $where: 'sleep(2000)' }));
     const startMs = Date.now();
@@ -139,7 +138,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // NoSQL Exfiltration
   test('NoSQL Exfiltration: NoSQL operators in order-tracking must not return all orders', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     // NeDB-backed order tracking: pass a MongoDB $gt operator as the order ID
     const payload = encodeURIComponent(JSON.stringify({ $gt: '' }));
     const res = await client.get(`/rest/track-order/${payload}`);
@@ -153,7 +152,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // NoSQL Manipulation
   test('NoSQL Manipulation: MongoDB update operators in review PATCH must be blocked', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const auth = new AuthHelper(request);
     const token = await auth.loginAsAdmin();
     // NeDB-backed reviews: $inc or $set operators should be rejected
@@ -170,7 +169,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // SSTi (Server-Side Template Injection)
   test('SSTi: template expression in profile field must not be evaluated', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const auth = new AuthHelper(request);
     const token = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
 
@@ -192,7 +191,7 @@ test.describe('Injection (OWASP A03:2021)', () => {
 
   // User Credentials (UNION-based credential exfiltration)
   test('User Credentials: credential exfiltration via UNION injection must be blocked', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get(
       "/api/Products?q='))UNION SELECT id,email,password,4,5,6,7,8,9 FROM Users--"
     );

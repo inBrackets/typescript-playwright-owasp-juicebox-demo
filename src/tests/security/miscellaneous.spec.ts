@@ -67,7 +67,7 @@ test.describe('Miscellaneous', () => {
 
   // Security Advisory
   test('Security Advisory: SECURITY.md or CVE disclosure must exist', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/SECURITY.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -78,7 +78,7 @@ test.describe('Miscellaneous', () => {
 
   // Security Policy
   test('Security Policy: /.well-known/security.txt must exist', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/.well-known/security.txt');
     const body = await res.text();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -93,7 +93,7 @@ test.describe('Miscellaneous', () => {
   // The chatbot eventually surrenders a coupon code after repeated requests.
   // A hardened chatbot must never emit a discount coupon regardless of persistence.
   test('Bully Chatbot: chatbot must not hand out a coupon code under repeated pressure', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const auth = new AuthHelper(request);
     const token = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
 
@@ -119,7 +119,7 @@ test.describe('Miscellaneous', () => {
 
   // Wallet Depletion
   test('Wallet Depletion: wallet balance manipulation must require authentication', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.post('/api/Wallets', { balance: -999 });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(

@@ -23,7 +23,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
   test('API-only XSS: stored XSS via product description API must not execute in browser', async ({ request, page }) => {
     const auth = new AuthHelper(request);
     const adminToken = await auth.loginAsAdmin();
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const xss = `<iframe src="javascript:alert('xss-api')">`;
 
     await client.put('/api/Products/1', { description: xss }, adminToken);
@@ -148,7 +148,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
   test('Server-side XSS Protection: XSS in feedback comment must not execute when rendered', async ({ request, page }) => {
     const auth = new AuthHelper(request);
     const token = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
 
     const xssPayload = `<iframe src="javascript:alert('xss-ssr')">`;
 
@@ -163,7 +163,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     }, token);
 
     // Admin panel renders all feedback — visiting it triggers the stored payload
-    const adminToken = await new AuthHelper(request).loginAsAdmin();
+    const adminToken = await auth.loginAsAdmin();
     const xssExecuted = attachDialogDetector(page);
     await page.evaluate((tok: string) => localStorage.setItem('token', tok), adminToken);
     await page.goto(`${BASE}/#/administration`);

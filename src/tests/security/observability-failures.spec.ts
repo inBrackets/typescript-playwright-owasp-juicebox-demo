@@ -5,13 +5,11 @@ import { JuiceShopApiClient } from '../../helpers/api-client';
 // Verifies that internal server logs and operational metrics are not
 // exposed to unauthenticated external users.
 
-const BASE = 'http://localhost:3000';
-
 test.describe('Observability Failures (OWASP A09:2021)', () => {
 
   // Access Log
   test('Access Log: server access logs must not be publicly downloadable', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/support/logs');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -22,18 +20,18 @@ test.describe('Observability Failures (OWASP A09:2021)', () => {
 
   // Exposed Metrics
   test('Exposed Metrics: Prometheus /metrics endpoint must not be publicly accessible', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/metrics');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      res.status(),
+      [401, 403, 404].includes(res.status()),
       'Prometheus metrics endpoint must require authentication — not return 200 to anonymous requests'
-    ).not.toBe(200);
+    ).toBe(true);
   });
 
   // Leaked Access Logs
   test('Leaked Access Logs: access logs must not be accessible via the FTP directory', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/');
     const body = await res.text();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
@@ -45,7 +43,7 @@ test.describe('Observability Failures (OWASP A09:2021)', () => {
 
   // Misplaced Signature File
   test('Misplaced Signature File: signature file must not be publicly accessible', async ({ request }) => {
-    const client = new JuiceShopApiClient(request, BASE);
+    const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/suspicious_errors.yml');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
