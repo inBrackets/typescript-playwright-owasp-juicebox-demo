@@ -27,8 +27,14 @@ jobs:
       actions: read   # dawidd6/action-download-artifact needs this to list prior runs
 
     # ── OWASP Juice Shop ──────────────────────────────────────────────────
-    # The health-check runs INSIDE the container. Juice Shop is a Node.js app,
-    # so node is guaranteed to be present; curl/wget are not.
+    # Health-check uses wget (busybox, always present on Alpine-based images).
+    # Avoids nested-quote escaping issues that break node -e health commands
+    # when GitHub Actions serialises the options string into docker run args.
+    #
+    # Start period is 60s: newer Juice Shop versions (v17+) run two external
+    # domain-reachability checks during startup (Alchemy + Ollama) before the
+    # HTTP server binds to port 3000, adding ~20s over the old 40s window.
+    #
     # GitHub Actions will not advance past this block until the container
     # reports healthy, so no explicit sleep is needed in the steps below.
     services:
@@ -37,11 +43,11 @@ jobs:
         ports:
           - 3000:3000
         options: >-
-          --health-cmd "node -e \"require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))\""
+          --health-cmd "wget -q --spider http://localhost:3000 || exit 1"
           --health-interval 10s
-          --health-timeout 10s
+          --health-timeout 5s
           --health-retries 20
-          --health-start-period 40s
+          --health-start-period 60s
 
     steps:
       # ── Source ────────────────────────────────────────────────────────
