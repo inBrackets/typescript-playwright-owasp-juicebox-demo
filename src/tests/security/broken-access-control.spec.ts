@@ -22,7 +22,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // AI Debugging — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_reveal_some_behind_the_scenes_information_on_the_chatbot_as_a_non_admin_user
+  // AI Debugging — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_reveal_some_behind_the_scenes_information_on_the_chatbot_as_a_non_admin_user
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reveal_some_behind_the_scenes_information_on_the_chatbot_as_a_non_admin_user
   test('AI Debugging: AI debug endpoint must require admin auth', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/chatbot/status', userToken);
@@ -34,7 +35,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).toBe(true);
   });
 
-  // Admin Section — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_access_the_administration_section_of_the_store
+  // Admin Section — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_access_the_administration_section_of_the_store
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_access_the_administration_section_of_the_store
   test('Admin Section: admin panel must redirect unauthenticated users', async ({ page }) => {
     const adminPage = new AdminPage(page);
     await adminPage.navigate();
@@ -47,7 +49,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).not.toContain('/administration');
   });
 
-  // CSRF — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_change_the_name_of_a_user_by_performing_cross_site_request_forgery_from_another_origin
+  // CSRF — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_change_the_name_of_a_user_by_performing_cross_site_request_forgery_from_another_origin
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_change_the_name_of_a_user_by_performing_cross_site_request_forgery_from_another_origin
   // The CSRF challenge is to change the authenticated user's username from a cross-origin page.
   // PUT /api/Users/:id is the endpoint — it must reject requests from untrusted origins.
   test('CSRF: cross-origin profile update must be rejected', async ({ request }) => {
@@ -66,7 +69,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Easter Egg
+  // Easter Egg — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_find_the_hidden_easter_egg
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_find_the_hidden_easter_egg
   test('Easter Egg: /ftp/eastere.gg must not be directly accessible', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/eastere.gg');
@@ -77,7 +81,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Five-Star Feedback
+  // Five-Star Feedback — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_get_rid_of_all_5_star_customer_feedback
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_get_rid_of_all_5_star_customer_feedback
   test('Five-Star Feedback: only admin can delete feedback', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
 
@@ -106,7 +111,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).toBe(401);
   });
 
-  // Forged Feedback
+  // Forged Feedback — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_post_some_feedback_in_another_users_name
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_post_some_feedback_in_another_users_name
   test('Forged Feedback: posting feedback on behalf of another user must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
 
@@ -131,7 +137,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).not.toBe(1);
   });
 
-  // Forged Review
+  // Forged Review — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_post_a_product_review_as_another_user_or_edit_any_users_existing_review
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_post_a_product_review_as_another_user_or_edit_any_users_existing_review
   test('Forged Review: editing another user\'s review must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.patch('/rest/products/1/reviews', {
@@ -145,7 +152,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).toBe(true);
   });
 
-  // Manipulate Basket
+  // Manipulate Basket — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_put_an_additional_product_into_another_users_shopping_basket
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_put_an_additional_product_into_another_users_shopping_basket
   test('Manipulate Basket: adding to another user\'s basket must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/api/BasketItems', {
@@ -160,7 +168,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).toBe(true);
   });
 
-  // Product Tampering
+  // Product Tampering — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_change_the_href_of_the_link_within_the_o_saft_product_description
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_change_the_href_of_the_link_within_the_o_saft_product_description
   test('Product Tampering: non-admin must not modify product descriptions', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.put('/api/Products/1', {
@@ -173,7 +182,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).toBe(true);
   });
 
-  // SSRF
+  // SSRF — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_request_a_hidden_resource_on_server_through_server
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_request_a_hidden_resource_on_server_through_server
   test('SSRF: server must not fetch arbitrary internal URLs on behalf of the user', async ({ request }) => {
     const res = await request.post(`${BASE}/rest/saveLoginIp`, {
       headers: { 'X-Forwarded-For': 'http://localhost:3000/api/Users/' },
@@ -185,7 +195,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).not.toBe(200);
   });
 
-  // View Basket
+  // View Basket — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_view_another_users_shopping_basket
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_view_another_users_shopping_basket
   test('View Basket: user must not read another user\'s basket', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     // Basket 1 is typically admin's; attempt access as normal user
@@ -197,7 +208,8 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
     ).toBe(true);
   });
 
-  // Web3 Sandbox
+  // Web3 Sandbox — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_find_an_accidentally_deployed_code_sandbox
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_find_an_accidentally_deployed_code_sandbox
   test('Web3 Sandbox: blockchain dev interface must require authentication', async ({ page }) => {
     await page.goto(`${BASE}/#/web3-sandbox`);
     await page.waitForLoadState('networkidle');

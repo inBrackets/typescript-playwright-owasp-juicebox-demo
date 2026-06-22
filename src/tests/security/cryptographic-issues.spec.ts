@@ -18,7 +18,8 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
     adminToken = await auth.loginAsAdmin();
   });
 
-  // Forged Coupon — https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_forge_a_coupon_code_that_gives_you_a_discount_of_at_least_80
+  // Forged Coupon — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_forge_a_coupon_code_that_gives_you_a_discount_of_at_least_80
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_forge_a_coupon_code_that_gives_you_a_discount_of_at_least_80
   // The coupon redemption endpoint is PUT /rest/basket/:basketId/coupon/:coupon (coupon in URL path).
   // Calling POST /rest/basket/1/coupon/apply with body always returns 404 regardless of coupon
   // validity — the vulnerability is never actually tested.
@@ -36,7 +37,8 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
     ).toBe(true);
   });
 
-  // Imaginary Challenge — https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_solve_challenge_999
+  // Imaginary Challenge — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_solve_challenge_999
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_solve_challenge_999
   test('Imaginary Challenge: non-existent challenge endpoint must return 404', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/imaginary', userToken);
@@ -47,7 +49,8 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
     ).toBe(404);
   });
 
-  // Nested Easter Egg — https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_apply_some_advanced_cryptanalysis_to_find_the_real_easter_egg
+  // Nested Easter Egg — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_apply_some_advanced_cryptanalysis_to_find_the_real_easter_egg
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_apply_some_advanced_cryptanalysis_to_find_the_real_easter_egg
   test('Nested Easter Egg: double-encoded URL must not bypass file access controls', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     // %2500 is a double-encoded null byte (%25 = %, making %2500 = %00 after one decode)
@@ -59,7 +62,8 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Premium Paywall
+  // Premium Paywall — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_unlock_premium_challenge_to_access_exclusive_content
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_unlock_premium_challenge_to_access_exclusive_content
   test('Premium Paywall: premium content must not be accessible without a valid subscription', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/deluxe-membership', userToken);
@@ -71,7 +75,8 @@ test.describe('Cryptographic Issues (OWASP A02:2021)', () => {
     ).not.toBe('active');
   });
 
-  // Weird Crypto
+  // Weird Crypto — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/cryptographic-issues.html#_inform_the_shop_about_an_algorithm_or_library_it_should_definitely_not_use_the_way_it_does
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_shop_about_an_algorithm_or_library_it_should_definitely_not_use_the_way_it_does
   test('Weird Crypto: password hashes must not use MD5 or other deprecated algorithms', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
 

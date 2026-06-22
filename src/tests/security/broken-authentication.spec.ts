@@ -8,7 +8,8 @@ import { AuthHelper } from '../../helpers/auth.helper';
 
 test.describe('Broken Authentication (OWASP A07:2021)', () => {
 
-  // Bjoern's Favorite Pet — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_reset_the_password_of_bjoerns_owasp_account_via_the_forgot_password_mechanism
+  // Bjoern's Favorite Pet — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_reset_the_password_of_bjoerns_owasp_account_via_the_forgot_password_mechanism
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_the_password_of_bjoerns_owasp_account_via_the_forgot_password_mechanism
   test("Bjoern's Favorite Pet: security question answer must not be trivially guessable", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const commonPets = ['cat', 'dog', 'fish', 'bird', 'unikitty'];
@@ -28,7 +29,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).toBe(false);
   });
 
-  // Change Bender's Password — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
+  // Change Bender's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_change_benders_password_into_slurmcl4ssic_without_using_sql_injection_or_forgot_password
   test("Change Bender's Password: user must not change another account's password", async ({ request }) => {
     const auth = new AuthHelper(request);
     const userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
@@ -48,7 +50,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).not.toBe(200);
   });
 
-  // GDPR Data Erasure — https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_log_in_with_chris_erased_user_account
+  // GDPR Data Erasure — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_log_in_with_chris_erased_user_account
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_log_in_with_chris_erased_user_account
   test('GDPR Data Erasure: deleted user account must not be usable for login', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const email = AuthHelper.uniqueEmail();
@@ -70,7 +73,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).toBe('');
   });
 
-  // Login Bjoern (OAuth bypass)
+  // Login Bjoern — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_log_in_with_bjoerns_gmail_account
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_log_in_with_bjoerns_gmail_account
   test('Login Bjoern: cannot login as bjoern via direct password auth (requires OAuth)', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const token = await client.login('bjoern.kimminich@gmail.com', 'bjoern');
@@ -81,7 +85,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).toBe('');
   });
 
-  // Password Strength
+  // Password Strength — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_log_in_with_the_administrators_user_credentials_without_previously_changing_them_or_applying_sql_injection
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_log_in_with_the_administrators_user_credentials_without_previously_changing_them_or_applying_sql_injection
   test('Password Strength: admin account must not use the default weak password', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const token = await client.login('admin@juice-sh.op', 'admin123');
@@ -92,7 +97,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).toBe('');
   });
 
-  // Reset Bender's Password
+  // Reset Bender's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_reset_benders_password_via_the_forgot_password_mechanism
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_benders_password_via_the_forgot_password_mechanism
   test("Reset Bender's Password: reset answer must not be publicly discoverable", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const guesses = ['Stop\'n\'Drop', 'samepassword', 'OwnedPassword'];
@@ -112,7 +118,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).toBe(false);
   });
 
-  // Reset Bjoern's Password
+  // Reset Bjoern's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_reset_the_password_of_bjoerns_internal_account_via_the_forgot_password_mechanism
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_the_password_of_bjoerns_internal_account_via_the_forgot_password_mechanism
   test("Reset Bjoern's Password: email-based reset must not expose token in response", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/user/forgot-password', {
@@ -127,7 +134,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).not.toMatch(/token|reset.*link/i);
   });
 
-  // Reset Jim's Password
+  // Reset Jim's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_reset_jims_password_via_the_forgot_password_mechanism
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_jims_password_via_the_forgot_password_mechanism
   test("Reset Jim's Password: security question answer must not be publicly discoverable", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const guesses = ['Samuel', 'James', 'Peter', 'Michael'];
@@ -147,7 +155,8 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     ).toBe(false);
   });
 
-  // Two Factor Authentication
+  // Two Factor Authentication — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-authentication.html#_solve_the_2fa_challenge_for_user_wurstbrot
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_solve_the_2fa_challenge_for_user_wurstbrot
   test('Two Factor Authentication: 2FA setup endpoint must require authentication', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/2fa/setup', { tfaToken: '000000' });

@@ -8,7 +8,8 @@ import { AuthHelper } from '../../helpers/auth.helper';
 
 test.describe('Security Misconfiguration (OWASP A05:2021)', () => {
 
-  // Cross-Site Imaging — https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-misconfiguration.html#_stick_cute_cross_domain_kittens_all_over_our_delivery_boxes
+  // Cross-Site Imaging — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-misconfiguration.html#_stick_cute_cross_domain_kittens_all_over_our_delivery_boxes
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_stick_cute_cross_domain_kittens_all_over_our_delivery_boxes
   test('Cross-Site Imaging: product images must not be served from untrusted cross-origin sources', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Products');
@@ -25,7 +26,8 @@ test.describe('Security Misconfiguration (OWASP A05:2021)', () => {
     ).toBe(0);
   });
 
-  // Deprecated Interface — https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-misconfiguration.html#_use_a_deprecated_b2b_interface_that_was_not_properly_shut_down
+  // Deprecated Interface — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-misconfiguration.html#_use_a_deprecated_b2b_interface_that_was_not_properly_shut_down
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_use_a_deprecated_b2b_interface_that_was_not_properly_shut_down
   test('Deprecated Interface: legacy B2B API endpoint must be disabled', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/b2b/v2/orders');
@@ -36,7 +38,8 @@ test.describe('Security Misconfiguration (OWASP A05:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Error Handling — https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-misconfiguration.html#_provoke_an_error_that_is_neither_very_gracefully_nor_consistently_handled
+  // Error Handling — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-misconfiguration.html#_provoke_an_error_that_is_neither_very_gracefully_nor_consistently_handled
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_provoke_an_error_that_is_neither_very_gracefully_nor_consistently_handled
   test('Error Handling: invalid routes must not expose stack traces', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/this-does-not-exist-at-all');
@@ -48,7 +51,8 @@ test.describe('Security Misconfiguration (OWASP A05:2021)', () => {
     ).not.toMatch(/at\s+\w+\s+\(.*\.js:\d+:\d+\)|Error:\s+Cannot/);
   });
 
-  // Login Support Team
+  // Login Support Team — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-misconfiguration.html#_log_in_with_the_support_teams_original_user_credentials
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_log_in_with_the_support_teams_original_user_credentials
   test('Login Support Team: support team account must not use easily guessable credentials', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const weakPasswords = ['support', 'J6aVjTgOpRs@?5l!Zkq2AYnCE@RF$P'];

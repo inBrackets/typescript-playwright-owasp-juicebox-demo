@@ -19,7 +19,8 @@ test.describe('Miscellaneous', () => {
     userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // Mass Dispel — https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_close_multiple_challenge_solved_notifications_in_one_go
+  // Mass Dispel — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_close_multiple_challenge_solved_notifications_in_one_go
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_close_multiple_challenge_solved_notifications_in_one_go
   test('Mass Dispel: all UI overlays must be dismissible', async ({ page }) => {
     await page.goto(`${BASE}/#/`);
     await page.waitForLoadState('networkidle');
@@ -41,7 +42,8 @@ test.describe('Miscellaneous', () => {
     ).toBe(0);
   });
 
-  // Privacy Policy — https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_read_our_privacy_policy
+  // Privacy Policy — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_read_our_privacy_policy
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_read_our_privacy_policy
   test('Privacy Policy: privacy policy page must be accessible', async ({ page }) => {
     await page.goto(`${BASE}/#/privacy-security/privacy-policy`);
     await page.waitForLoadState('networkidle');
@@ -53,7 +55,8 @@ test.describe('Miscellaneous', () => {
     ).toContain('privacy-policy');
   });
 
-  // Score Board — https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_find_the_carefully_hidden_score_board_page
+  // Score Board — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_find_the_carefully_hidden_score_board_page
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_find_the_carefully_hidden_score_board_page
   test('Score Board: score board must be accessible at /#/score-board', async ({ page }) => {
     const scoreboard = new ScoreboardPage(page);
     await scoreboard.navigate();
@@ -65,7 +68,8 @@ test.describe('Miscellaneous', () => {
     ).toBe(true);
   });
 
-  // Security Advisory
+  // Security Advisory — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_the_juice_shop_is_susceptible_to_a_known_vulnerability_in_a_library_for_which_an_advisory_has_already_been_issued
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_the_juice_shop_is_susceptible_to_a_known_vulnerability_in_a_library_for_which_an_advisory_has_already_been_issued
   test('Security Advisory: SECURITY.md or CVE disclosure must exist', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/SECURITY.md');
@@ -76,7 +80,8 @@ test.describe('Miscellaneous', () => {
     ).toBe(true);
   });
 
-  // Security Policy
+  // Security Policy — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_behave_like_any_white_hat_should_before_getting_into_the_action
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_behave_like_any_white_hat_should_before_getting_into_the_action
   test('Security Policy: /.well-known/security.txt must exist', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/.well-known/security.txt');
@@ -89,7 +94,8 @@ test.describe('Miscellaneous', () => {
     expect(body, 'security.txt must contain a Contact field').toMatch(/Contact:/i);
   });
 
-  // Bully Chatbot
+  // Bully Chatbot — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_receive_a_coupon_code_from_the_support_chatbot
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_receive_a_coupon_code_from_the_support_chatbot
   // The chatbot eventually surrenders a coupon code after repeated requests.
   // A hardened chatbot must never emit a discount coupon regardless of persistence.
   test('Bully Chatbot: chatbot must not hand out a coupon code under repeated pressure', async ({ request }) => {
@@ -117,7 +123,8 @@ test.describe('Miscellaneous', () => {
     ).toBe(0);
   });
 
-  // Wallet Depletion
+  // Wallet Depletion — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_withdraw_more_eth_from_the_new_wallet_than_you_deposited
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_withdraw_more_eth_from_the_new_wallet_than_you_deposited
   test('Wallet Depletion: wallet balance manipulation must require authentication', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/api/Wallets', { balance: -999 });

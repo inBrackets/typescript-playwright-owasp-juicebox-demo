@@ -23,7 +23,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     adminToken = await auth.loginAsAdmin();
   });
 
-  // Arbitrary File Write — https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_overwrite_the_legal_information_file
+  // Arbitrary File Write — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_overwrite_the_legal_information_file
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_overwrite_the_legal_information_file
   test('Arbitrary File Write: path traversal in file upload must be blocked', async ({ request }) => {
     const traversalContent = Buffer.from('malicious content');
     const res = await request.post(`${BASE}/file-upload`, {
@@ -43,7 +44,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).toBe(true);
   });
 
-  // Forged Signed JWT — https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_forge_an_almost_properly_rsa_signed_jwt_token
+  // Forged Signed JWT — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_forge_an_almost_properly_rsa_signed_jwt_token
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_forge_an_almost_properly_rsa_signed_jwt_token
   test('Forged Signed JWT: RS256 token signed with the RSA public key must be rejected', async ({ request }) => {
     // "Algorithm confusion" attack: server uses RS256 but if it falls back to HS256
     // and the attacker signs with the public key, it would verify successfully.
@@ -60,7 +62,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).toBe(true);
   });
 
-  // Frontend Typosquatting — https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_typosquatting_imposter_that_dug_itself_deep_into_the_frontend
+  // Frontend Typosquatting — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_typosquatting_imposter_that_dug_itself_deep_into_the_frontend
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_shop_about_a_typosquatting_imposter_that_dug_itself_deep_into_the_frontend
   test('Frontend Typosquatting: package-lock.json must not reference typosquatted packages', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');
@@ -73,7 +76,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).not.toMatch(/sequal|expres[^s]|lodahs|node-uuid-v4/i);
   });
 
-  // Legacy Typosquatting — https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_typosquatting_trick_it_has_been_a_victim_of
+  // Legacy Typosquatting — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_typosquatting_trick_it_has_been_a_victim_of
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_shop_about_a_typosquatting_trick_it_has_been_a_victim_of
   test('Legacy Typosquatting: legacy npm package names must not be present in the dependency tree', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');
@@ -86,7 +90,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).not.toMatch(/"sanitize-html":\s*"1\./);
   });
 
-  // Local File Read
+  // Local File Read — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_gain_read_access_to_an_arbitrary_local_file_on_the_web_server
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_gain_read_access_to_an_arbitrary_local_file_on_the_web_server
   test('Local File Read: path traversal in order tracking must not expose /etc/passwd', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/rest/track-order/..%2F..%2F..%2Fetc%2Fpasswd');
@@ -100,7 +105,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).not.toMatch(/root:x:|\/bin\/(bash|sh|ash)/);
   });
 
-  // Supply Chain Attack
+  // Supply Chain Attack — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_development_team_about_a_danger_to_some_of_their_credentials
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_development_team_about_a_danger_to_some_of_their_credentials
   test('Supply Chain Attack: integrity hashes must be present on externally loaded scripts', async ({ page }) => {
     await page.goto(`${BASE}/`);
     await page.waitForLoadState('networkidle');
@@ -122,7 +128,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).toBe(false);
   });
 
-  // Unsigned JWT
+  // Unsigned JWT — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_forge_an_essentially_unsigned_jwt_token
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_forge_an_essentially_unsigned_jwt_token
   test('Unsigned JWT: token with alg=none must be rejected', async ({ request }) => {
     const unsignedToken = buildJwt(
       { alg: 'none', typ: 'JWT' },
@@ -137,7 +144,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).toBe(true);
   });
 
-  // Kill Chatbot
+  // Kill Chatbot — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_permanently_disable_the_support_chatbot
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_permanently_disable_the_support_chatbot
   // The chatbot relies on a third-party library whose status/control endpoint
   // must not be accessible to unauthenticated or non-admin callers.
   test('Kill Chatbot: chatbot disable endpoint must require admin authentication', async ({ request }) => {
@@ -162,7 +170,8 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
     ).toBe(true);
   });
 
-  // Vulnerable Library
+  // Vulnerable Library — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_high_severity_vulnerability
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_shop_about_a_high_severity_vulnerability
   test('Vulnerable Library: frontend must not load a known vulnerable version of a JS library', async ({ page }) => {
     const issues: string[] = [];
 

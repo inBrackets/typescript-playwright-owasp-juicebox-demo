@@ -17,7 +17,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     userToken  = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // Confidential Document — https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_confidential_document
+  // Confidential Document — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_confidential_document
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_access_a_confidential_document
   test('Confidential Document: internal acquisition document must not be publicly accessible', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/acquisitions.md');
@@ -28,7 +29,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Email Leak — https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_perform_an_unwanted_information_disclosure_by_accessing_data_cross_domain
+  // Email Leak — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_perform_an_unwanted_information_disclosure_by_accessing_data_cross_domain
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_perform_an_unwanted_information_disclosure_by_accessing_data_cross_domain
   test('Email Leak: user list API must not expose all email addresses to non-admin', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Users/', userToken);
@@ -39,7 +41,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toBe(true);
   });
 
-  // Exposed Credentials — https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_a_developer_was_careless_with_hardcoding_unused_but_still_valid_credentials
+  // Exposed Credentials — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_a_developer_was_careless_with_hardcoding_unused_but_still_valid_credentials
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_a_developer_was_careless_with_hardcoding_unused_but_still_valid_credentials
   test('Exposed Credentials: main.js must not contain hardcoded credentials', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/main.js');
@@ -52,7 +55,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toMatch(/password\s*[:=]\s*["'][^"']{6,}/i);
   });
 
-  // Forgotten Developer Backup — https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_developers_forgotten_backup_file
+  // Forgotten Developer Backup — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_developers_forgotten_backup_file
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_access_a_developers_forgotten_backup_file
   test('Forgotten Developer Backup: package.json.bak must not be publicly downloadable', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/package.json.bak');
@@ -63,7 +67,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Forgotten Sales Backup
+  // Forgotten Sales Backup — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_access_a_salesmans_forgotten_backup_file
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_access_a_salesmans_forgotten_backup_file
   test('Forgotten Sales Backup: coupons backup file must not be publicly downloadable', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/coupons_2013.md.bak');
@@ -74,7 +79,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toBe(200);
   });
 
-  // GDPR Data Theft
+  // GDPR Data Theft — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_steal_someone_elses_personal_data_without_using_injection
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_steal_someone_elses_personal_data_without_using_injection
   test('GDPR Data Theft: user must not download another user\'s GDPR data export', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     // Attempt to download GDPR export for userId=1 (admin) as a regular user
@@ -87,7 +93,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toBe('admin@juice-sh.op');
   });
 
-  // Leaked API Key
+  // Leaked API Key — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_inform_the_shop_about_a_leaked_api_key
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_shop_about_a_leaked_api_key
   test('Leaked API Key: API keys must not appear in client-side JavaScript bundles', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/runtime.js');
@@ -100,7 +107,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toMatch(/[Aa][Pp][Ii][_-]?[Kk][Ee][Yy]\s*[:=]\s*["'][^"']{16,}/);
   });
 
-  // Leaked Unsafe Product
+  // Leaked Unsafe Product — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_identify_an_unsafe_product_that_was_removed_from_the_shop_and_inform_the_shop_which_ingredients_are_dangerous
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_identify_an_unsafe_product_that_was_removed_from_the_shop_and_inform_the_shop_which_ingredients_are_dangerous
   test('Leaked Unsafe Product: unsafe product must not appear in the public product list', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Products');
@@ -113,7 +121,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toBe(false);
   });
 
-  // Login Amy
+  // Login Amy — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_log_in_with_amys_original_user_credentials
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_log_in_with_amys_original_user_credentials
   test('Login Amy: Amy\'s password must not be trivially guessable', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const guesses = ['K1f...', 'K1f', 'password'];
@@ -125,7 +134,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toBe(false);
   });
 
-  // Login MC SafeSearch
+  // Login MC SafeSearch — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_log_in_with_mc_safesearchs_original_user_credentials
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_log_in_with_mc_safesearchs_original_user_credentials
   test('Login MC SafeSearch: MC SafeSearch password must not be derivable from public information', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const guesses = ['Mr. Noodles', 'mrnoodles', 'noodles'];
@@ -137,7 +147,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toBe(false);
   });
 
-  // Meta Geo Stalking
+  // Meta Geo Stalking — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_determine_the_answer_to_johns_security_question
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_determine_the_answer_to_johns_security_question
   test('Meta Geo Stalking: photo metadata must not expose precise geolocation', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/uploads/favorite-hiking-place.png');
@@ -151,7 +162,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toMatch(/image\//);
   });
 
-  // NFT Takeover
+  // NFT Takeover — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_take_over_the_wallet_containing_our_official_soul_bound_token
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_take_over_the_wallet_containing_our_official_soul_bound_token
   test('NFT Takeover: NFT ownership transfer must require wallet authentication', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/nftMint', { nftId: 1 });
@@ -162,7 +174,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toBe(true);
   });
 
-  // Password Hash Leak
+  // Password Hash Leak — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html
   test('Password Hash Leak: password hashes must not be exposed via the user API', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/api/Users/', adminToken);
@@ -176,7 +189,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toBe(true);
   });
 
-  // Reset Uvogin's Password
+  // Reset Uvogin's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_reset_uvogins_password_via_the_forgot_password_mechanism
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_uvogins_password_via_the_forgot_password_mechanism
   test("Reset Uvogin's Password: security answer must not be obtainable from public social media", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const guesses = ['Mr. Noodles', 'Squeaky', 'uvogin'];
@@ -195,7 +209,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).toBe(false);
   });
 
-  // Retrieve Blueprint
+  // Retrieve Blueprint — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_deprive_the_shop_of_earnings_by_downloading_the_blueprint_for_one_of_its_products
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_deprive_the_shop_of_earnings_by_downloading_the_blueprint_for_one_of_its_products
   test('Retrieve Blueprint: product blueprint file must not be publicly downloadable', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/products/JuiceShop.stl');
@@ -206,7 +221,8 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Visual Geo Stalking
+  // Visual Geo Stalking — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/sensitive-data-exposure.html#_determine_the_answer_to_emmas_security_question
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_determine_the_answer_to_emmas_security_question
   test('Visual Geo Stalking: profile photo must not expose identifiable location metadata', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/uploads/IMG_4253.jpg');

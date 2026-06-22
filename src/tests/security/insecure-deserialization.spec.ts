@@ -21,7 +21,8 @@ test.describe('Insecure Deserialization (OWASP A08:2021)', () => {
     userId = AuthHelper.getUserId(userToken) ?? 0;
   });
 
-  // Blocked RCE DoS — https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_perform_a_remote_code_execution_that_would_keep_a_less_hardened_application_busy_forever
+  // Blocked RCE DoS — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_perform_a_remote_code_execution_that_would_keep_a_less_hardened_application_busy_forever
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_perform_a_remote_code_execution_that_would_keep_a_less_hardened_application_busy_forever
   test('Blocked RCE DoS: RCE payload in file upload must be blocked before execution', async ({ request }) => {
     const rcePayload = Buffer.from(
       '{"rce":"_$$ND_FUNC$$_function(){require(\'child_process\').exec(\'id\')}"}'
@@ -39,7 +40,8 @@ test.describe('Insecure Deserialization (OWASP A08:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Memory Bomb — https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_drop_some_explosive_data_into_a_vulnerable_file_handling_endpoint
+  // Memory Bomb — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_drop_some_explosive_data_into_a_vulnerable_file_handling_endpoint
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_drop_some_explosive_data_into_a_vulnerable_file_handling_endpoint
   test('Memory Bomb: excessively large nested payload must be rejected before OOM', async ({ request }) => {
     // A deep zip bomb: send a very large JSON payload that would expand in memory
     const largePayload = JSON.stringify({ a: 'x'.repeat(50_000) });
@@ -54,7 +56,8 @@ test.describe('Insecure Deserialization (OWASP A08:2021)', () => {
     ).toBe(true);
   });
 
-  // Successful RCE DoS — https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_perform_a_remote_code_execution_that_occupies_the_server_for_a_while_without_using_infinite_loops
+  // Successful RCE DoS — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_perform_a_remote_code_execution_that_occupies_the_server_for_a_while_without_using_infinite_loops
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_perform_a_remote_code_execution_that_occupies_the_server_for_a_while_without_using_infinite_loops
   test('Successful RCE DoS: node-serialize RCE via profile image URL must be blocked', async ({ request }) => {
     if (!userId) return;
     const client = new JuiceShopApiClient(request);

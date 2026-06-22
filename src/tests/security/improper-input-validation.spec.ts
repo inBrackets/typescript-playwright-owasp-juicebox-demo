@@ -20,7 +20,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     userToken = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
   });
 
-  // Admin Registration — https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_register_as_a_user_with_administrator_privileges
+  // Admin Registration — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_register_as_a_user_with_administrator_privileges
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_register_as_a_user_with_administrator_privileges
   test('Admin Registration: role field in registration payload must be ignored', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const email = AuthHelper.uniqueEmail();
@@ -33,7 +34,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).not.toBe('admin');
   });
 
-  // Deluxe Fraud — https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_obtain_a_deluxe_membership_without_paying_for_it
+  // Deluxe Fraud — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_obtain_a_deluxe_membership_without_paying_for_it
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_obtain_a_deluxe_membership_without_paying_for_it
   test('Deluxe Fraud: deluxe membership must not be obtainable without payment', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/deluxe-membership', {
@@ -46,7 +48,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Empty User Registration — https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_register_a_user_with_an_empty_email_and_password
+  // Empty User Registration — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_register_a_user_with_an_empty_email_and_password
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_register_a_user_with_an_empty_email_and_password
   test('Empty User Registration: blank email must be rejected during registration', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.register('', 'Test@1234!');
@@ -57,7 +60,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).toBe(true);
   });
 
-  // Expired Coupon
+  // Expired Coupon — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_successfully_redeem_an_expired_campaign_coupon_code
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_successfully_redeem_an_expired_campaign_coupon_code
   // The coupon redemption endpoint is PUT /rest/basket/:basketId/coupon/:coupon (coupon in URL path).
   // Calling POST /rest/basket/1/coupon/apply with body always returns 404 regardless of coupon
   // validity — the vulnerability is never actually tested.
@@ -73,7 +77,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).toBe(true);
   });
 
-  // Mint the Honey Pot
+  // Mint the Honey Pot — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_mint_the_honey_pot_nft_by_gathering_bees_from_the_bee_haven
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_mint_the_honey_pot_nft_by_gathering_bees_from_the_bee_haven
   test('Mint the Honey Pot: NFT minting must require valid authentication', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.post('/rest/nftMint', { nftId: 1 });
@@ -84,7 +89,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).toBe(true);
   });
 
-  // Missing Encoding
+  // Missing Encoding — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_retrieve_the_photo_of_bjoerns_cat_in_melee_combat_mode
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_retrieve_the_photo_of_bjoerns_cat_in_melee_combat_mode
   test('Missing Encoding: URL with unencoded emoji must not crash the application', async ({ page }) => {
     await page.goto(`${BASE}/#/search?q=😼`);
     await page.waitForLoadState('networkidle');
@@ -96,7 +102,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).toContain('OWASP Juice Shop');
   });
 
-  // Payback Time
+  // Payback Time — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_place_an_order_that_makes_you_rich
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_place_an_order_that_makes_you_rich
   // Using userToken with BasketId=1 (admin's basket) causes the server to return 401 for
   // basket ownership failure — the negative-quantity validation is never reached, making the
   // test pass for the wrong reason. Use adminToken so ownership is satisfied.
@@ -115,7 +122,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).toBe(true);
   });
 
-  // Poison Null Byte
+  // Poison Null Byte — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_bypass_a_security_control_with_a_poison_null_byte
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_bypass_a_security_control_with_a_poison_null_byte
   test('Poison Null Byte: null-byte-encoded path must not bypass FTP extension filter', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/eastere.gg%00.md');
@@ -126,7 +134,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).not.toBe(200);
   });
 
-  // Repetitive Registration
+  // Repetitive Registration — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_follow_the_dry_principle_while_registering_a_user
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_follow_the_dry_principle_while_registering_a_user
   test('Repetitive Registration: duplicate email registration must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const email = AuthHelper.uniqueEmail();
@@ -139,7 +148,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).toBe(true);
   });
 
-  // Upload Size
+  // Upload Size — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_upload_a_file_larger_than_100_kb
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_upload_a_file_larger_than_100_kb
   test('Upload Size: oversized file upload must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     // Create an in-memory 110 kB buffer (exceeds typical 100 kB limit)
@@ -157,7 +167,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).toBe(true);
   });
 
-  // Upload Type
+  // Upload Type — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_upload_a_file_that_has_no_pdf_or_zip_extension
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_upload_a_file_that_has_no_pdf_or_zip_extension
   test('Upload Type: executable file upload must be rejected', async ({ request }) => {
     const exeContent = Buffer.from('MZ'); // PE header magic bytes
     const res = await request.post(`${BASE}/file-upload`, {
@@ -171,7 +182,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
     ).toBe(true);
   });
 
-  // Zero Stars
+  // Zero Stars — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_give_a_devastating_zero_star_feedback_to_the_store
+  // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_give_a_devastating_zero_star_feedback_to_the_store
   test('Zero Stars: zero-star feedback rating must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
 
