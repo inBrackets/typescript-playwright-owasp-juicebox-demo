@@ -26,30 +26,24 @@ jobs:
       contents: read  # checkout
       actions: read   # dawidd6/action-download-artifact needs this to list prior runs
 
-    # ── OWASP Juice Shop ──────────────────────────────────────────────────
-    # --no-healthcheck disables both the image's built-in HEALTHCHECK and any
-    # options-based health-cmd we might specify. This is intentional:
-    #
-    # GitHub Actions splits the `options` string on whitespace without
-    # respecting shell quoting, so any --health-cmd that contains spaces
-    # (i.e. every useful command) is silently broken at the word boundary —
-    # the runner passes only the first word as the command and the rest as
-    # stray docker-run flags that are ignored.
-    #
-    # Readiness is handled instead by the explicit "Wait for Juice Shop" step
-    # below, which runs curl on the GitHub Actions runner (not inside the
-    # container) and therefore has no quoting constraints.
-    services:
-      juice-shop:
-        image: bkimminich/juice-shop:latest
-        ports:
-          - 3000:3000
-        options: --no-healthcheck
-
     steps:
       # ── Source ────────────────────────────────────────────────────────
       - name: Checkout source
         uses: actions/checkout@v4
+
+      # ── Start Juice Shop ───────────────────────────────────────────────
+      # Run as a plain detached container rather than a service container.
+      # GitHub Actions' service-container health-check mechanism splits the
+      # `options` string on whitespace without respecting shell quoting, which
+      # silently breaks any --health-cmd that contains spaces (i.e. every
+      # useful command). Running Docker directly avoids that entirely.
+      #
+      # Started before the toolchain steps so the image pull and the
+      # Juice Shop startup sequence overlap with npm ci + browser install.
+      # Juice Shop v17+ runs Alchemy + Ollama reachability probes before
+      # binding port 3000, so ~60–90 s of startup happens "for free" here.
+      - name: Start Juice Shop
+        run: docker run -d -p 3000:3000 --name juice-shop bkimminich/juice-shop:latest
 
       # ── Allure history (cross-run persistence) ─────────────────────────
       # dawidd6/action-download-artifact can query previous workflow runs,
@@ -77,10 +71,10 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # ── Wait for Juice Shop ────────────────────────────────────────────
+      # By this point npm ci + browser install have consumed ~60–90 s, so
+      # Juice Shop is usually ready on the first or second poll.
       # curl is always available on ubuntu-latest and runs on the runner,
-      # so there are no quoting or binary-availability issues.
-      # Juice Shop v17+ runs Alchemy + Ollama reachability probes at startup
-      # before binding port 3000, so we allow up to 120s (24 × 5s sleeps).
+      # avoiding any binary-availability or quoting issues inside the container.
       - name: Wait for Juice Shop to be ready
         run: |
           echo "Polling http://localhost:3000 until Juice Shop is ready..."
@@ -93,6 +87,7 @@ jobs:
             sleep 5
           done
           echo "Juice Shop did not become ready within 120s"
+          docker logs juice-shop
           exit 1
 
       # ── Test execution ─────────────────────────────────────────────────
