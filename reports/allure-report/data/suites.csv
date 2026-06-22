@@ -1,4 +1,0 @@
-"DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
-"","5926","tautology comment variant must not bypass login","chromium","2026-06-22","passed","2026-06-22","SQL Injection – Authentication Bypass (OWASP A03:2021)","sqli.spec.ts","",""
-"","3541","classic OR-based payload must not bypass login","chromium","2026-06-22","failed","2026-06-22","SQL Injection – Authentication Bypass (OWASP A03:2021)","sqli.spec.ts","",""
-"","2932","login form must display an error on invalid credentials — not swallow them silently","chromium","2026-06-22","passed","2026-06-22","SQL Injection – Authentication Bypass (OWASP A03:2021)","sqli.spec.ts","",""
