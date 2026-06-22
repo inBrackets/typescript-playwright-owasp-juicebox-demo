@@ -1,0 +1,227 @@
+name: Playwright Security Regression
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Prevent concurrent Pages deployments from racing each other.
+# PRs that get superseded by a newer push are cancelled immediately.
+# Pushes to main are queued so each deployment completes before the next starts.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# ============================================================================
+# JOB 1 — Run the security test suite and produce all report artefacts
+# ============================================================================
+jobs:
+  test:
+    name: Security Regression Tests
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read  # checkout
+      actions: read   # dawidd6/action-download-artifact needs this to list prior runs
+
+    # ── OWASP Juice Shop ──────────────────────────────────────────────────
+    # The health-check runs INSIDE the container. Juice Shop is a Node.js app,
+    # so node is guaranteed to be present; curl/wget are not.
+    # GitHub Actions will not advance past this block until the container
+    # reports healthy, so no explicit sleep is needed in the steps below.
+    services:
+      juice-shop:
+        image: bkimminich/juice-shop:latest
+        ports:
+          - 3000:3000
+        options: >-
+          --health-cmd "node -e \"require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))\""
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 20
+          --health-start-period 40s
+
+    steps:
+      # ── Source ────────────────────────────────────────────────────────
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # ── Allure history (cross-run persistence) ─────────────────────────
+      # dawidd6/action-download-artifact can query previous workflow runs,
+      # unlike actions/download-artifact which is scoped to the current run.
+      # On the very first run this step emits a warning and no history is set.
+      - name: Download Allure history from previous run
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: allure-history
+          path: allure-history
+          if_no_artifact_found: warn
+        continue-on-error: true
+
+      # ── Node.js & toolchain ───────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install Playwright browser binaries
+        run: npx playwright install --with-deps chromium
+
+      # ── Test execution ─────────────────────────────────────────────────
+      # continue-on-error keeps the pipeline alive so reports are always
+      # generated and published — even when a vulnerability is detected and
+      # a test correctly fails.
+      - name: Run Playwright security test suite
+        id: playwright_run
+        run: npm test
+        continue-on-error: true
+
+      # ── Allure report generation ───────────────────────────────────────
+      # History must be injected into the results directory BEFORE generation
+      # so Allure can build trend graphs from previous executions.
+      - name: Inject Allure history into results directory
+        run: |
+          mkdir -p reports/allure-results/history
+          if [ -d "allure-history" ]; then
+            cp -r allure-history/. reports/allure-results/history/
+            echo "Allure trend history restored from previous run."
+          else
+            echo "No prior history found — trend graphs will start from this run."
+          fi
+
+      - name: Generate Allure report
+        run: npx allure generate reports/allure-results --clean -o reports/allure-report
+
+      # Persist only the /history sub-directory so the next run can draw trend graphs.
+      - name: Save Allure history artefact for next run
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-history
+          path: reports/allure-report/history
+          retention-days: 90
+          overwrite: true
+
+      # ── Assemble GitHub Pages deployment directory ─────────────────────
+      - name: Assemble deployment directory
+        run: |
+          mkdir -p deploy/allure deploy/playwright-html
+
+          # Allure report (the /history sub-dir inside it drives future trends)
+          cp -r reports/allure-report/. deploy/allure/
+
+          # Playwright HTML report (self-contained; includes trace viewer)
+          if [ -d "reports/html" ]; then
+            cp -r reports/html/. deploy/playwright-html/
+          fi
+
+          # Root landing page linking to both viewers
+          cat > deploy/index.html << 'LANDING'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Security Test Reports — OWASP Juice Shop</title>
+            <style>
+              *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+              body {
+                font-family: system-ui, -apple-system, sans-serif;
+                background: #f5f5f7; color: #1d1d1f;
+                display: flex; flex-direction: column; align-items: center;
+                min-height: 100vh; padding: 3.5rem 1rem;
+              }
+              h1   { font-size: 1.8rem; font-weight: 700; margin-bottom: .35rem; }
+              .sub { color: #6e6e73; margin-bottom: 2.5rem; font-size: .95rem; }
+              .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 1.25rem; width: 100%; max-width: 680px;
+              }
+              .card {
+                background: #fff; border-radius: 14px; padding: 1.75rem;
+                box-shadow: 0 2px 10px rgba(0,0,0,.07);
+              }
+              .card h2 { font-size: 1.05rem; margin-bottom: .5rem; }
+              .card p  { font-size: .875rem; color: #6e6e73; line-height: 1.55; }
+              .btn {
+                display: inline-block; margin-top: 1.25rem;
+                padding: .55rem 1.25rem;
+                background: #0071e3; color: #fff;
+                border-radius: 7px; text-decoration: none;
+                font-size: .875rem; font-weight: 500;
+              }
+              .btn:hover { background: #0077ed; }
+            </style>
+          </head>
+          <body>
+            <h1>Security Regression — Test Reports</h1>
+            <p class="sub">OWASP Juice Shop &nbsp;&middot;&nbsp; Powered by GitHub Actions</p>
+            <div class="grid">
+              <div class="card">
+                <h2>Allure Report</h2>
+                <p>Historical trends, step-level detail, attached screenshots, and trace files.</p>
+                <a class="btn" href="allure/index.html">Open Allure</a>
+              </div>
+              <div class="card">
+                <h2>Playwright HTML</h2>
+                <p>Native Playwright report with interactive trace viewer, videos, and diffs.</p>
+                <a class="btn" href="playwright-html/index.html">Open Playwright</a>
+              </div>
+            </div>
+          </body>
+          </html>
+          LANDING
+
+      - name: Upload GitHub Pages artefact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: deploy
+
+      # Re-raise any test failure AFTER all reporting steps complete.
+      # This ensures the job is marked red in CI when a vulnerability is caught,
+      # while guaranteeing the report is always published first.
+      - name: Propagate test suite outcome
+        if: steps.playwright_run.outcome == 'failure'
+        run: |
+          echo "::error::One or more security regression tests failed. Review the published reports."
+          exit 1
+
+  # ============================================================================
+  # JOB 2 — Deploy the assembled artefact to GitHub Pages
+  #
+  # Runs after the test job regardless of pass/fail (if: always()) so the
+  # report is always published, including when a vulnerability is detected.
+  # Scoped to main/master pushes only — PRs get test results but no deployment.
+  # ============================================================================
+  deploy:
+    name: Deploy Reports to GitHub Pages
+    needs: test
+    if: >
+      always() &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+      github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # required if using branch-based Pages fallback
+      pages: write      # required to deploy via the GitHub Pages API
+      id-token: write   # required for the OIDC token used by deploy-pages
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

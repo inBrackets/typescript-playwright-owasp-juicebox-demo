@@ -1,0 +1,25 @@
+{
+  "name": "typescript-playwright-owasp-juicebox-demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:security": "playwright test src/tests/security/",
+    "test:functional": "playwright test src/tests/functional/",
+    "report:html": "playwright show-report reports/html",
+    "report:allure": "allure serve reports/allure-results"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^26.0.0",
+    "allure-commandline": "^2.43.0",
+    "allure-js-commons": "^3.10.0",
+    "allure-playwright": "^3.10.0",
+    "typescript": "^6.0.3"
+  }
+}
