@@ -252,10 +252,12 @@ test.describe('Injection (OWASP A03:2021)', () => {
   // order processing response or downstream order-history data.
   test('SSTi: Pug template expression in B2B order XML must not be evaluated', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    // XML payload with a Pug template expression embedded in an XML comment.
+    // XML payload with a Pug template expression embedded in element text content.
     // Juice Shop's B2B order processor passes this through a Pug renderer on the server.
+    // The expression must be in an element text node — XML comments are stripped by the parser
+    // and never reach the Pug template engine.
     const xmlPayload = '<?xml version="1.0" encoding="UTF-8"?>'
-      + '<orderLinesData><!--\n#{7*7}\n--></orderLinesData>';
+      + '<orderLinesData>#{7*7}</orderLinesData>';
 
     const b2bRes = await request.post(`${BASE}/b2b/v2/orders`, {
       headers: { Authorization: `Bearer ${userToken}`, 'Content-Type': 'application/xml' },

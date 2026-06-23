@@ -71,17 +71,34 @@ test.describe('Insecure Deserialization (OWASP A08:2021)', () => {
 
   // Successful RCE DoS — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_perform_a_remote_code_execution_that_occupies_the_server_for_a_while_without_using_infinite_loops
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_perform_a_remote_code_execution_that_occupies_the_server_for_a_while_without_using_infinite_loops
-  test('Successful RCE DoS: node-serialize RCE via profile image URL must be blocked', async ({ request }) => {
-    expect(userId, 'userId must be non-zero to test the RCE endpoint').toBeGreaterThan(0);
+  // The exploit: POST /b2b/v2/orders with a node-serialize IIFE that busy-loops for 2 seconds.
+  // PUT /api/Users/:id always returns 401 in Juice Shop v20 (epilogue JWT decoder bug) and never
+  // reaches the deserialisation code — that endpoint cannot detect this vulnerability.
+  test('Successful RCE DoS: node-serialize RCE via B2B order endpoint must be blocked', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const rceUrl = '_$$ND_FUNC$$_function(){require(\'child_process\').exec(\'id\')}()';
-    const res = await client.put(`/api/Users/${userId}`, { profileImage: rceUrl }, userToken);
+    // Finite busy-loop: occupies the event loop for ~2 s without crashing (no infinite loop).
+    const rcePayload = JSON.stringify({
+      orderLines: [{
+        productId: 1,
+        quantity: '_$$ND_FUNC$$_function(){var s=new Date().getTime();while(new Date().getTime()-s<2000){}}()',
+        customerReference: 'rce-successful-test',
+      }],
+    });
+    const startMs = Date.now();
+    const res = await client.postRaw('/b2b/v2/orders', rcePayload, 'application/json', userToken);
+    const elapsedMs = Date.now() - startMs;
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // A 200 means node-serialize evaluated the IIFE — RCE is exploitable via the B2B endpoint.
     expect(
       res.status(),
-      'RCE payload as profileImage URL must be rejected or sanitised'
+      'node-serialize IIFE in B2B order must be rejected — a 200 means RCE is exploitable'
     ).not.toBe(200);
+    // Secondary check: if the busy-loop ran, the response would be delayed by ~2 s.
+    expect(
+      elapsedMs,
+      'Server must not stall while processing the B2B order — a >2 s delay means the RCE sleep executed'
+    ).toBeLessThan(2000);
   });
 
 });

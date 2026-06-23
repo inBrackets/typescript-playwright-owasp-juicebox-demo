@@ -145,16 +145,24 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
 
   // Reflected XSS — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/xss.html#_perform_a_reflected_xss_attack
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_perform_a_reflected_xss_attack
-  test('Reflected XSS: URL parameter must not reflect unencoded script into the page', async ({ page }) => {
+  // The challenge description specifies <iframe src="javascript:alert(`xss`)"> as the payload.
+  // <script> tags injected via innerHTML are inert (browsers never execute dynamically-injected scripts),
+  // so the prior <script> payload always passed — masking that <iframe javascript:> DOES execute via
+  // the search query parameter, which Angular renders with bypassSecurityTrustHtml.
+  test('Reflected XSS: iframe javascript: payload in URL search parameter must not execute', async ({ page }) => {
     const xssExecuted = attachDialogDetector(page);
-    await page.goto(`${BASE}/#/search?q=<script>alert('xss-reflected')</script>`);
+    // Navigate directly to the search page with the XSS payload in the URL query parameter.
+    // Angular renders the search term via bypassSecurityTrustHtml — the iframe src executes on vulnerable Juice Shop.
+    await page.goto(`${BASE}/#/search?q=<iframe src="javascript:alert('xss-reflected')">`);
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
     const dom = await page.content();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
-    expect(xssExecuted(), 'Reflected XSS payload must not execute').toBe(false);
-    expect(dom, 'Reflected XSS must be encoded in the DOM')
-      .not.toContain(`<script>alert('xss-reflected')</script>`);
+    // xssExecuted() fires if the javascript: iframe src was evaluated in the browser.
+    expect(xssExecuted(), 'Reflected XSS iframe payload must not execute').toBe(false);
+    expect(dom, 'Reflected XSS iframe payload must not appear unescaped in rendered DOM')
+      .not.toContain(`<iframe src="javascript:alert('xss-reflected')">`);
   });
 
   // Server-side XSS Protection — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/xss.html#_perform_a_persisted_xss_attack_bypassing_a_server_side_security_mechanism

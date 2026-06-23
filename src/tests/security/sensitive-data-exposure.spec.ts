@@ -241,10 +241,12 @@ test.describe('Sensitive Data Exposure (OWASP A02:2021)', () => {
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_determine_the_answer_to_emmas_security_question
   test('Visual Geo Stalking: security answer derivable from profile photo must not reset password', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    // The background in Emma's profile photo visually identifies 'ITsec GmbH' — her security answer.
+    // The background in Emma's profile photo visually identifies 'ITsec' — her security answer.
+    // The stored answer is 'ITsec' (without the corporate suffix 'GmbH'); the full 'ITsec GmbH'
+    // variant does not match the stored hash and returns 401.
     const res = await client.post('/rest/user/reset-password', {
       email: 'emma@juice-sh.op',
-      answer: 'ITsec GmbH',
+      answer: 'ITsec',
       new: 'NewPwd@1234!',
       repeat: 'NewPwd@1234!',
     });

@@ -122,11 +122,13 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_the_password_of_bjoerns_internal_account_via_the_forgot_password_mechanism
   test("Reset Bjoern's Password: security question answer must not be publicly discoverable", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    // The correct answer to bjoern@juice-sh.op's security question is 'Scala' (from Stack Overflow).
+    // The correct answer to bjoern@juice-sh.op's security question is 'West-2082':
+    // the old postal code for Uetersen, Germany, derivable from https://www.alte-postleitzahlen.de/uetersen
+    // The security question is "Your ZIP/postal code when you were a teenager?" (question id 9).
     // On stock Juice Shop this succeeds (200) because the answer is publicly discoverable.
     const res = await client.post('/rest/user/reset-password', {
       email: 'bjoern@juice-sh.op',
-      answer: 'Scala',
+      answer: 'West-2082',
       new: 'NewPwd@1234!',
       repeat: 'NewPwd@1234!',
     });
@@ -134,7 +136,7 @@ test.describe('Broken Authentication (OWASP A07:2021)', () => {
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       res.status(),
-      "Bjoern's internal account must not be resettable with a publicly discoverable answer (Scala)"
+      "Bjoern's internal account must not be resettable with a publicly discoverable ZIP code (West-2082)"
     ).not.toBe(200);
   });
 

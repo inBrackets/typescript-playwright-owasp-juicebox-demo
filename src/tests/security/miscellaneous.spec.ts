@@ -71,15 +71,23 @@ test.describe('Miscellaneous', () => {
 
   // Security Advisory — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_the_juice_shop_is_susceptible_to_a_known_vulnerability_in_a_library_for_which_an_advisory_has_already_been_issued
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_the_juice_shop_is_susceptible_to_a_known_vulnerability_in_a_library_for_which_an_advisory_has_already_been_issued
-  test('Security Advisory: SECURITY.md must not be publicly accessible via the FTP directory', async ({ request }) => {
+  // The vulnerability: Juice Shop publishes a CSAF (Common Security Advisory Framework) document at
+  // /.well-known/csaf/provider-metadata.json that reveals its known CVEs and library vulnerabilities.
+  // An attacker can enumerate /.well-known/csaf/ to find security advisories for the exact version in use.
+  // Note: /ftp/SECURITY.md does NOT exist in v20 — the actual advisory is in the CSAF directory.
+  test('Security Advisory: CSAF provider metadata must not be publicly accessible', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/SECURITY.md');
+    // The CSAF provider metadata at /.well-known/csaf/provider-metadata.json is the entry point
+    // for discovering all published security advisories, including known CVEs for this Juice Shop version.
+    // On stock Juice Shop this returns 200 with a real JSON document — the advisory IS exposed.
+    const res = await client.get('/.well-known/csaf/provider-metadata.json');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
-    // On stock Juice Shop the file IS served (200) — exposing the security advisory is the vulnerability.
+    // A 200 with real CSAF JSON (>100 bytes, not the SPA fallback) means the security advisory is exposed.
+    const body = await res.text();
     expect(
-      res.status(),
-      'SECURITY.md must not be publicly downloadable from the FTP directory'
-    ).not.toBe(200);
+      res.status() === 200 && body.length > 100 && body.includes('"canonical_url"'),
+      'CSAF provider metadata must not be publicly accessible — exposing it reveals known CVEs for this version'
+    ).toBe(false);
   });
 
   // Security Policy — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_behave_like_any_white_hat_should_before_getting_into_the_action

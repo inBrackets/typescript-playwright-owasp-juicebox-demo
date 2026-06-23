@@ -42,15 +42,20 @@ test.describe('Security through Obscurity', () => {
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_rat_out_a_notorious_character_hiding_in_plain_sight_in_the_shop
   test('Steganography: product image binary data must not contain embedded plaintext credentials', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/assets/public/images/products/StrawberryShake.jpg');
+    // The 20th-anniversary product image (20th.jpeg) is the steganographic carrier.
+    // All other product JPEGs are under 260 KB; this image is ~1.5 MB because steghide
+    // has embedded hidden content inside its pixel LSBs. The file size is the only
+    // reliable indicator without running the steghide CLI tool.
+    const res = await client.get('/assets/public/images/products/20th.jpeg');
     if (res.status() !== 200) return;
-    // Steganographic content is embedded in pixel data — check raw body for plaintext credential strings.
-    const rawBody = (await res.body()).toString('latin1');
+    const bodyBytes = await res.body();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // A size above 500 KB means the image carries steganographically embedded hidden data —
+    // all legitimate product JPEGs are under 260 KB; 20th.jpeg is ~1.5 MB with steghide content.
     expect(
-      rawBody,
-      'Image binary data must not contain embedded plaintext credential strings'
-    ).not.toMatch(/password\s*[:=]\s*\S+|secret\s*[:=]\s*\S+/i);
+      bodyBytes.length,
+      'Product JPEG must not exceed 500 KB — a size above 500 KB indicates steghide-embedded hidden content in the pixel data'
+    ).toBeLessThan(500_000);
   });
 
 });

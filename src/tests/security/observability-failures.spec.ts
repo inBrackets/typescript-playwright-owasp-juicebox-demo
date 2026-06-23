@@ -33,15 +33,21 @@ test.describe('Observability Failures (OWASP A09:2021)', () => {
 
   // Leaked Access Logs — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/observability-failures.html#_dumpster_dive_the_internet_for_a_leaked_password_and_log_in_to_the_original_user_account_it_belongs_to
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_dumpster_dive_the_internet_for_a_leaked_password_and_log_in_to_the_original_user_account_it_belongs_to
-  test('Leaked Access Logs: access.log must not be directly downloadable from the FTP directory', async ({ request }) => {
+  // The exploit: an access log was published to a Pastebin-style platform (linked from Stack Overflow).
+  // The log contains a cleartext password for support@juice-sh.op, discoverable via password spraying.
+  // The vulnerability IS the valid login — not file accessibility on /ftp/access.log (which is
+  // blocked 403 by the .log extension filter regardless of whether the challenge exists).
+  test('Leaked Access Logs: credentials from leaked access log must not authenticate', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    // The exploit: access.log is placed in the FTP directory and is directly downloadable.
-    const res = await client.get('/ftp/access.log');
+    // Password found in the publicly leaked access log (via Pastebin / Stack Overflow breadcrumb).
+    // On stock Juice Shop the account still uses this password — login succeeds (non-empty token).
+    const token = await client.login('support@juice-sh.op', 'J6aVjTgOpRs@?5l!Zkq2AYnCE@RF$P');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // A non-empty token means the leaked password is still valid — the account was never hardened.
     expect(
-      res.status(),
-      'Server access.log must not be directly downloadable from the public FTP directory'
-    ).not.toBe(200);
+      token,
+      'Leaked password must not authenticate — support account must have rotated credentials'
+    ).toBe('');
   });
 
   // Misplaced Signature File — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/observability-failures.html#_access_a_misplaced_siem_signature_file
