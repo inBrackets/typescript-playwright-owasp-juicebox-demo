@@ -33,22 +33,23 @@ test.describe('Observability Failures (OWASP A09:2021)', () => {
 
   // Leaked Access Logs — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/observability-failures.html#_dumpster_dive_the_internet_for_a_leaked_password_and_log_in_to_the_original_user_account_it_belongs_to
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_dumpster_dive_the_internet_for_a_leaked_password_and_log_in_to_the_original_user_account_it_belongs_to
-  test('Leaked Access Logs: access logs must not be accessible via the FTP directory', async ({ request }) => {
+  test('Leaked Access Logs: access.log must not be directly downloadable from the FTP directory', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/');
-    const body = await res.text();
+    // The exploit: access.log is placed in the FTP directory and is directly downloadable.
+    const res = await client.get('/ftp/access.log');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      body,
-      'FTP directory listing must not expose access log files'
-    ).not.toMatch(/access.*\.log|server\.log/i);
+      res.status(),
+      'Server access.log must not be directly downloadable from the public FTP directory'
+    ).not.toBe(200);
   });
 
   // Misplaced Signature File — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/observability-failures.html#_access_a_misplaced_siem_signature_file
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_access_a_misplaced_siem_signature_file
   test('Misplaced Signature File: signature file must not be publicly accessible', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/suspicious_errors.yml');
+    // The .yml extension is blocked; %2500.md bypass is needed to access the file.
+    const res = await client.get('/ftp/suspicious_errors.yml%2500.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       res.status(),

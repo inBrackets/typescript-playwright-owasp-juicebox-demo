@@ -25,37 +25,48 @@ test.describe('Insecure Deserialization (OWASP A08:2021)', () => {
 
   // Blocked RCE DoS — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_perform_a_remote_code_execution_that_would_keep_a_less_hardened_application_busy_forever
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_perform_a_remote_code_execution_that_would_keep_a_less_hardened_application_busy_forever
-  test('Blocked RCE DoS: RCE payload in file upload must be blocked before execution', async ({ request }) => {
-    const rcePayload = Buffer.from(
-      '{"rce":"_$$ND_FUNC$$_function(){require(\'child_process\').exec(\'id\')}"}'
-    );
-    const res = await request.post(`${BASE}/file-upload`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-      multipart: {
-        file: { name: 'rce.zip', mimeType: 'application/zip', buffer: rcePayload },
-      },
+  test('Blocked RCE DoS: node-serialize IIFE payload in B2B order must not be executed', async ({ request }) => {
+    const client = new JuiceShopApiClient(request);
+    // The actual attack surface is the B2B XML/JSON order endpoint which deserialises the
+    // order body using node-serialize — a library that evaluates _$$ND_FUNC$$_ IIFEs.
+    // Sending the payload as the 'quantity' field triggers deserialisation.
+    const rceJson = JSON.stringify({
+      orderLines: [
+        {
+          productId: 1,
+          quantity: '_$$ND_FUNC$$_function(){require(\'child_process\').exec(\'id\')}()',
+          customerReference: 'rce-test',
+        },
+      ],
     });
+    const res = await client.postRaw('/b2b/v2/orders', rceJson, 'application/json', userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // A 200 means the RCE payload was deserialised and the order accepted — node-serialize is unpatched.
     expect(
       res.status(),
-      'RCE payload in upload must not return 200 (execution blocked)'
+      'node-serialize IIFE in B2B order must be rejected — a 200 means RCE is exploitable'
     ).not.toBe(200);
   });
 
   // Memory Bomb — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_drop_some_explosive_data_into_a_vulnerable_file_handling_endpoint
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_drop_some_explosive_data_into_a_vulnerable_file_handling_endpoint
-  test('Memory Bomb: excessively large nested payload must be rejected before OOM', async ({ request }) => {
-    // A deep zip bomb: send a very large JSON payload that would expand in memory
-    const largePayload = JSON.stringify({ a: 'x'.repeat(50_000) });
-    const res = await request.post(`${BASE}/rest/user/login`, {
-      data: largePayload,
-      headers: { 'Content-Type': 'application/json' },
+  test('Memory Bomb: large zip upload must be rejected before causing memory exhaustion', async ({ request }) => {
+    // The Memory Bomb challenge targets the file-upload endpoint, not the login endpoint.
+    // Upload a 5 MB file (well above Juice Shop's ~100 KB limit) to verify the server rejects
+    // it before attempting decompression — a real zip bomb exploits the compression ratio.
+    const largeBuf = Buffer.alloc(5 * 1024 * 1024, 0);
+    const startMs = Date.now();
+    const res = await request.post(`${BASE}/file-upload`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      multipart: { file: { name: 'bomb.zip', mimeType: 'application/zip', buffer: largeBuf } },
     });
+    const elapsedMs = Date.now() - startMs;
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      [400, 413, 422].includes(res.status()),
-      'Oversized login payload must be rejected before causing a memory issue'
+      [400, 413, 422, 500].includes(res.status()),
+      'Oversized zip upload must be rejected (413) before causing a memory issue — not return 200'
     ).toBe(true);
+    expect(elapsedMs, 'Server must not hang while processing a large upload').toBeLessThan(30_000);
   });
 
   // Successful RCE DoS — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/insecure-deserialization.html#_perform_a_remote_code_execution_that_occupies_the_server_for_a_while_without_using_infinite_loops

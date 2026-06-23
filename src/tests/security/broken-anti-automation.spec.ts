@@ -64,13 +64,12 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
 
   // Multiple Likes — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-anti-automation.html#_like_any_review_at_least_three_times_as_the_same_user
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_like_any_review_at_least_three_times_as_the_same_user
-  // The like endpoint is POST /rest/products/reviews/:reviewId/like — the review ID is
-  // a NeDB _id string. Calling /rest/products/1/reviews/like (wrong path) always returns
-  // 404 and never tests the actual rate-limiting vulnerability.
+  // The like endpoint is PUT /rest/products/:productId/reviews with body { id: reviewId }.
+  // Sending three consecutive likes from the same user must be rejected after the first.
   test('Multiple Likes: same user must not like a review more than once', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
 
-    // Fetch existing reviews for product 1 to obtain a real review ID
+    // Fetch existing reviews for product 1 to obtain a real NeDB review _id
     const reviewsRes = await client.get('/rest/products/1/reviews');
     const reviewsBody = await reviewsRes.json() as { data?: Array<{ _id: string }> };
     const reviews = reviewsBody.data ?? [];
@@ -78,37 +77,42 @@ test.describe('Broken Anti Automation (OWASP A07:2021)', () => {
     expect(reviews.length, 'Product 1 must have at least one seeded review to test Multiple Likes').toBeGreaterThan(0);
 
     const reviewId = reviews[0]._id;
-    const firstLike  = await client.post(`/rest/products/reviews/${reviewId}/like`, {}, userToken);
-    const secondLike = await client.post(`/rest/products/reviews/${reviewId}/like`, {}, userToken);
+    await client.put('/rest/products/1/reviews', { id: reviewId }, userToken);
+    const secondLike = await client.put('/rest/products/1/reviews', { id: reviewId }, userToken);
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
-    // If the same user can like the same review twice (200 on second call), anti-automation is broken.
+    // Both likes returning 201 means the same user can like the same review multiple times —
+    // anti-automation is broken.
     expect(
       secondLike.status(),
-      'A second like on the same review from the same user must be rejected (Multiple Likes vulnerability)'
-    ).not.toBe(200);
+      'A second like on the same review by the same user must be rejected (Multiple Likes vulnerability present if 201)'
+    ).not.toBe(201);
   });
 
   // Reset Morty's Password — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-anti-automation.html#_reset_mortys_password_via_the_forgot_password_mechanism
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_reset_mortys_password_via_the_forgot_password_mechanism
+  // The vulnerability: no rate limiting on the forgot-password endpoint allows unlimited brute force.
+  // A hardened server must return 429 after repeated wrong answers.
   test("Reset Morty's Password: security question brute-force must be rate-limited", async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    // '5N0wb4ll' is Morty's cat's name — the correct answer per the companion guide.
-    const attempts = ['5N0wb4ll', 'Snowball', 'cat', 'dog', 'hamster'];
-    const statuses = await Promise.all(attempts.map(answer =>
-      client.post('/rest/user/reset-password', {
-        email: 'morty@juice-sh.op',
-        answer,
-        new: 'NewPwd@1234!',
-        repeat: 'NewPwd@1234!',
-      }).then(res => res.status())
-    ));
+    const ATTEMPTS = 20;
+    const statuses = await Promise.all(
+      Array.from({ length: ATTEMPTS }, (_, i) =>
+        client.post('/rest/user/reset-password', {
+          email: 'morty@juice-sh.op',
+          answer: `brute${i}`,
+          new: 'NewPwd@1234!',
+          repeat: 'NewPwd@1234!',
+        }).then(res => res.status())
+      )
+    );
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // If zero requests return 429, the endpoint has no rate limiting — brute force is unrestricted.
     expect(
-      statuses.some(s => s === 200),
-      'None of the brute-forced answers should succeed; Morty\'s answer must not be trivially guessable'
-    ).toBe(false);
+      statuses.some(s => s === 429),
+      'Forgot-password endpoint must return 429 after repeated wrong answers (Broken Anti-Automation if never 429)'
+    ).toBe(true);
   });
 
 });

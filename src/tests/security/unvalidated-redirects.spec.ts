@@ -10,14 +10,21 @@ test.describe('Unvalidated Redirects (OWASP A01:2021)', () => {
 
   // Allowlist Bypass — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/unvalidated-redirects.html#_enforce_a_redirect_to_a_page_you_are_not_supposed_to_redirect_to
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_enforce_a_redirect_to_a_page_you_are_not_supposed_to_redirect_to
-  test('Allowlist Bypass: redirect endpoint must not forward to non-allowlisted domains', async ({ page }) => {
-    await page.goto(`${BASE}/redirect?to=https://evil.com`);
+  test('Allowlist Bypass: redirect endpoint must not be bypassable by embedding an allowlisted URL', async ({ page }) => {
+    // The vulnerability: the allowlist check uses String.includes() rather than exact matching,
+    // so appending an allowlisted URL in the fragment bypasses the check.
+    // to=https://evil.com#https://github.com/bkimminich/juice-shop passes the allowlist
+    // but the browser navigates to evil.com (fragment is ignored for routing).
+    const bypassUrl = encodeURIComponent(
+      'https://evil.com#https://github.com/bkimminich/juice-shop'
+    );
+    await page.goto(`${BASE}/redirect?to=${bypassUrl}`);
     await page.waitForLoadState('networkidle');
     const currentUrl = page.url();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       currentUrl,
-      'Redirect endpoint must not forward to arbitrary external domains'
+      'Allowlist bypass via URL fragment must not redirect to evil.com'
     ).not.toContain('evil.com');
   });
 

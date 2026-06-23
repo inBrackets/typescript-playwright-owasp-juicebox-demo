@@ -53,22 +53,26 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // CSRF — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_change_the_name_of_a_user_by_performing_cross_site_request_forgery_from_another_origin
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_change_the_name_of_a_user_by_performing_cross_site_request_forgery_from_another_origin
-  // The CSRF challenge is to change the authenticated user's username from a cross-origin page.
-  // PUT /api/Users/:id is the endpoint — it must reject requests from untrusted origins.
-  test('CSRF: cross-origin profile update must be rejected', async ({ request }) => {
-    const uid = AuthHelper.getUserId(userToken);
-    expect(uid, 'getUserId must decode a valid UID from userToken for the CSRF test').toBeDefined();
+  // The CSRF challenge: a state-changing request from a cross-origin page must be rejected.
+  // PUT /rest/products/:productId/reviews with Origin: evil.com demonstrates the missing CORS check.
+  test('CSRF: cross-origin state-changing request must be rejected', async ({ request }) => {
+    const client = new JuiceShopApiClient(request);
+    const reviewsRes = await client.get('/rest/products/1/reviews');
+    const reviewsBody = await reviewsRes.json() as { data?: Array<{ _id: string }> };
+    const reviews = reviewsBody.data ?? [];
+    expect(reviews.length, 'Product 1 must have at least one seeded review to test CSRF').toBeGreaterThan(0);
+    const reviewId = reviews[0]._id;
 
-    const res = await request.put(`${BASE}/api/Users/${uid}`, {
-      data: { username: 'csrf-pwned' },
+    const res = await request.put(`${BASE}/rest/products/1/reviews`, {
+      data: { id: reviewId },
       headers: { Authorization: `Bearer ${userToken}`, Origin: 'https://evil.com' },
     });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
-    // Status 200 means the server accepted a cross-origin state-changing request — CSRF is unprotected.
+    // Status 201 means the server accepted a cross-origin state-changing request — CSRF is unprotected.
     expect(
       res.status(),
-      'Cross-origin profile update from evil.com must be rejected (CSRF vulnerability present if 200)'
-    ).not.toBe(200);
+      'Cross-origin state-changing PUT from evil.com must be rejected (CSRF vulnerability present if 201)'
+    ).not.toBe(201);
   });
 
   // Easter Egg — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_find_the_hidden_easter_egg
@@ -158,17 +162,28 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // Manipulate Basket — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_put_an_additional_product_into_another_users_shopping_basket
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_put_an_additional_product_into_another_users_shopping_basket
-  test('Manipulate Basket: adding to another user\'s basket must be rejected', async ({ request }) => {
+  // The attack: PUT /api/BasketItems/:id has no ownership check — any authenticated user can modify
+  // any basket item by its NeDB ID, regardless of which user's basket it belongs to.
+  test('Manipulate Basket: modifying another user\'s basket item must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.post('/api/BasketItems', {
+
+    // Admin adds an item to their own basket to create a known basket item ID
+    const addRes = await client.post('/api/BasketItems', {
       BasketId: 1,
-      ProductId: 1,
+      ProductId: 2,
       quantity: 1,
-    }, userToken);
+    }, adminToken);
+    const addBody = await addRes.json() as { data?: { id?: number } };
+    const basketItemId = addBody.data?.id;
+    expect(basketItemId, 'Admin must be able to create a basket item for Manipulate Basket test').toBeDefined();
+
+    // A different user tries to modify admin's basket item — must be rejected
+    const res = await client.put(`/api/BasketItems/${basketItemId!}`, { quantity: 2 }, userToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Status 200 means the user modified another user's basket item — Manipulate Basket is present.
     expect(
       [401, 403].includes(res.status()),
-      'Adding items to a basket owned by another user must be rejected'
+      'Modifying another user\'s basket item must return 401 or 403 (vulnerability present if 200)'
     ).toBe(true);
   });
 
@@ -188,15 +203,33 @@ test.describe('Broken Access Control (OWASP A01:2021)', () => {
 
   // SSRF — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_request_a_hidden_resource_on_server_through_server
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_request_a_hidden_resource_on_server_through_server
+  // The attack: POST /profile with profileImage set to an internal URL causes the server to fetch it
+  // (SSRF). A hardened server should reject internal URLs with 400/422; a vulnerable server attempts
+  // the fetch and may return 500 when it fails or gets blocked.
   test('SSRF: server must not fetch arbitrary internal URLs on behalf of the user', async ({ request }) => {
-    const res = await request.post(`${BASE}/rest/saveLoginIp`, {
-      headers: { 'X-Forwarded-For': 'http://localhost:3000/api/Users/' },
+    const boundary = 'ssrf-test-boundary';
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="profileImage"',
+      '',
+      'http://localhost:3000/api/Users/',
+      `--${boundary}--`,
+    ].join('\r\n');
+
+    const res = await request.post(`${BASE}/profile`, {
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      data: body,
     });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Status 500 means the server attempted to fetch the URL (SSRF in progress) and failed internally.
+    // A hardened server must return 400 or 422 to reject the internal URL before any fetch attempt.
     expect(
-      res.status(),
-      'SSRF via X-Forwarded-For must be rejected or ignored'
-    ).not.toBe(200);
+      [400, 422].includes(res.status()),
+      'Internal URL in profileImage must be rejected before fetch (SSRF vulnerability present if 500)'
+    ).toBe(true);
   });
 
   // View Basket — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/broken-access-control.html#_view_another_users_shopping_basket

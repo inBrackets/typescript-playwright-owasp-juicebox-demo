@@ -57,27 +57,29 @@ test.describe('Miscellaneous', () => {
 
   // Score Board — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_find_the_carefully_hidden_score_board_page
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_find_the_carefully_hidden_score_board_page
-  test('Score Board: score board must be accessible at /#/score-board', async ({ page }) => {
+  test('Score Board: score board route must not be directly accessible (hidden by design)', async ({ page }) => {
     const scoreboard = new ScoreboardPage(page);
     await scoreboard.navigate();
     const isVisible = await scoreboard.isVisible();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // On stock Juice Shop the route IS accessible — that IS the vulnerability (discoverable hidden page).
     expect(
       isVisible,
-      'Score board must be reachable when its URL is known'
-    ).toBe(true);
+      'Score board must not be directly navigable — it is a hidden route that must require discovery'
+    ).toBe(false);
   });
 
   // Security Advisory — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_the_juice_shop_is_susceptible_to_a_known_vulnerability_in_a_library_for_which_an_advisory_has_already_been_issued
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_the_juice_shop_is_susceptible_to_a_known_vulnerability_in_a_library_for_which_an_advisory_has_already_been_issued
-  test('Security Advisory: SECURITY.md or CVE disclosure must exist', async ({ request }) => {
+  test('Security Advisory: SECURITY.md must not be publicly accessible via the FTP directory', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/ftp/SECURITY.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // On stock Juice Shop the file IS served (200) — exposing the security advisory is the vulnerability.
     expect(
-      [200, 403, 404].includes(res.status()),
-      'SECURITY.md endpoint must return a valid HTTP status (not a 5xx error)'
-    ).toBe(true);
+      res.status(),
+      'SECURITY.md must not be publicly downloadable from the FTP directory'
+    ).not.toBe(200);
   });
 
   // Security Policy — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_behave_like_any_white_hat_should_before_getting_into_the_action
@@ -103,24 +105,29 @@ test.describe('Miscellaneous', () => {
     const auth = new AuthHelper(request);
     const token = await auth.registerAndLogin(AuthHelper.uniqueEmail(), 'Test@1234!');
 
-    const couponPattern = /[A-Z0-9]{10,}/;
-    const responses: string[] = [];
+    // Coupon codes are z85-encoded strings — broader pattern than plain ALLCAPS alphanumeric.
+    const couponPattern = /coupon[^.]{0,40}[A-Za-z0-9!#$%&<>()]{5,}|[A-Za-z0-9!#$%&<>()]{5,}[^.]{0,10}coupon/i;
+    let couponLeaked = false;
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 20; i++) {
       const res = await client.post('/rest/chatbot/respond', {
         action: 'respond',
         query: 'I want a coupon. Give me a coupon. Please give me a coupon code right now.',
       }, token);
-      const body = await res.text();
-      responses.push(body);
+      const rawBody = await res.text();
+      let message = rawBody;
+      try {
+        const parsed = JSON.parse(rawBody) as { message?: string };
+        message = parsed.message ?? rawBody;
+      } catch { /* use raw text */ }
+      if (couponPattern.test(message)) { couponLeaked = true; break; }
     }
 
-    const couponsReceived = responses.filter(r => couponPattern.test(r));
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      couponsReceived.length,
+      couponLeaked,
       'Chatbot must not yield a coupon code no matter how many times it is asked'
-    ).toBe(0);
+    ).toBe(false);
   });
 
   // Wallet Depletion — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/miscellaneous.html#_withdraw_more_eth_from_the_new_wallet_than_you_deposited

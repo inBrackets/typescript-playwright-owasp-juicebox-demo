@@ -30,8 +30,10 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     await client.put('/api/Products/1', { description: xss }, adminToken);
 
     const xssExecuted = attachDialogDetector(page);
-    await page.goto(`${BASE}/#/`);
+    // Product descriptions render on the search results page, not the home page.
+    await page.goto(`${BASE}/#/search`);
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -51,6 +53,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     await main.navigate();
     await main.navbar.search(`<iframe src="javascript:alert(\`xss\`)">`);
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       xssExecuted(),
@@ -80,14 +83,16 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     const xssExecuted = attachDialogDetector(page);
     const main = new MainPage(page);
     await main.navigate();
-    await main.navbar.search(`<script>alert('xss-client')</script>`);
+    // <script> tags injected via innerHTML don't execute — use an event handler payload instead.
+    await main.navbar.search(`<img src="x" onerror="alert('xss-client')">`);
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
     const dom = await page.content();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(xssExecuted(), 'Client-side XSS payload must not execute').toBe(false);
-    expect(dom, 'Raw <script> tag must not appear unencoded in rendered DOM')
-      .not.toContain(`<script>alert('xss-client')</script>`);
+    expect(dom, 'onerror XSS payload must not appear unencoded in rendered DOM')
+      .not.toContain(`<img src="x" onerror="alert('xss-client')">`);
   });
 
   // DOM XSS — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/xss.html#_perform_a_dom_xss_attack
@@ -99,6 +104,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     await main.navbar.search(`<iframe src="javascript:alert('xss-dom')">`);
     await page.waitForLoadState('networkidle');
 
+    await page.waitForTimeout(3000);
     const dom = await page.content();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(xssExecuted(), 'DOM XSS iframe payload must not execute').toBe(false);
@@ -113,20 +119,22 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
   test('HTTP-Header XSS: XSS stored via X-Forwarded-For login IP must not execute on profile page', async ({ request, page }) => {
     const auth = new AuthHelper(request);
     const email = AuthHelper.uniqueEmail();
-    await auth.registerAndLogin(email, 'Test@1234!');
+    const userToken = await auth.registerAndLogin(email, 'Test@1234!');
 
     const xssPayload = `<iframe src="javascript:alert('xss-header')">`;
 
-    // Login a second time with the XSS payload as the apparent IP
+    // Second login with XSS payload in X-Forwarded-For — stores the payload as the last-login IP.
     await request.post(`${BASE}/rest/user/login`, {
       data: { email, password: 'Test@1234!' },
       headers: { 'X-Forwarded-For': xssPayload },
     });
 
     const xssExecuted = attachDialogDetector(page);
-    // Navigating to profile triggers rendering of the stored last-login IP
+    // Inject the auth token so Angular renders the profile page (not the login redirect).
+    await page.addInitScript((tok: string) => { window.localStorage.setItem('token', tok); }, userToken);
     await page.goto(`${BASE}/#/profile`);
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -177,6 +185,7 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     await page.addInitScript((tok: string) => { window.localStorage.setItem('token', tok); }, adminToken);
     await page.goto(`${BASE}/#/administration`);
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
@@ -192,15 +201,17 @@ test.describe('XSS – Cross-Site Scripting (OWASP A03:2021)', () => {
     await page.goto(`${BASE}/#/about`);
     await page.waitForLoadState('networkidle');
 
-    // Attempt to inject via the video subtitle track parameter if present
-    await page.goto(`${BASE}/#/about?subtitles=<script>alert('xss-video')</script>`);
+    // The video page reflects the 'lang' query parameter into a <track> src attribute unsanitised.
+    // iframe javascript: is the correct payload for attribute-context injection.
+    await page.goto(`${BASE}/#/about?lang=<iframe src="javascript:alert('xss-video')">`);
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
     const dom = await page.content();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(xssExecuted(), 'Video subtitle XSS must not execute').toBe(false);
-    expect(dom, 'XSS via video subtitle parameter must not appear unescaped in DOM')
-      .not.toContain(`<script>alert('xss-video')</script>`);
+    expect(dom, 'XSS via video lang parameter must not appear unescaped in DOM')
+      .not.toContain(`<iframe src="javascript:alert('xss-video')">`);
   });
 
 });

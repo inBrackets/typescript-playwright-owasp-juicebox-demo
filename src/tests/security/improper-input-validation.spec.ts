@@ -50,25 +50,29 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Empty User Registration — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_register_a_user_with_an_empty_email_and_password
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_register_a_user_with_an_empty_email_and_password
-  test('Empty User Registration: blank email must be rejected during registration', async ({ request }) => {
-    const client = new JuiceShopApiClient(request);
-    const res = await client.register('', 'Test@1234!');
+  // The vulnerability: omitting the email field entirely (not sending '' but omitting it) causes
+  // the server to create a user with a null/empty email address (status 201).
+  // Sending email: '' is correctly rejected (400); the field must be omitted to trigger the bug.
+  test('Empty User Registration: registration without email field must be rejected', async ({ request }) => {
+    const res = await request.post(`${BASE}/api/Users`, {
+      data: { password: 'Test@1234!', passwordRepeat: 'Test@1234!' },
+    });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Status 201 means the server created a user without an email — Empty User Registration is present.
     expect(
-      [400, 422].includes(res.status()),
-      'Registration with empty email must be rejected'
-    ).toBe(true);
+      res.status(),
+      'Registration with no email field must be rejected (Empty User Registration vulnerability present if 201)'
+    ).not.toBe(201);
   });
 
   // Expired Coupon — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_successfully_redeem_an_expired_campaign_coupon_code
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_successfully_redeem_an_expired_campaign_coupon_code
-  // The coupon redemption endpoint is PUT /rest/basket/:basketId/coupon/:coupon (coupon in URL path).
-  // Calling POST /rest/basket/1/coupon/apply with body always returns 404 regardless of coupon
-  // validity — the vulnerability is never actually tested.
+  // The coupon redemption endpoint is GET /rest/basket/:basketId/coupon/:coupon (coupon in URL path).
+  // Using PUT always returns 404 regardless of coupon validity — the vulnerability is never tested.
   test('Expired Coupon: expired coupon codes must be rejected', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    // Use admin's basket (bid=1) so ownership is satisfied and only coupon validity is checked.
-    const res = await client.put('/rest/basket/1/coupon/WMNSDY2019', {}, adminToken);
+    // Use admin's basket (bid=1) so ownership is satisfied and only coupon expiry is checked.
+    const res = await client.get('/rest/basket/1/coupon/WMNSDY2019', adminToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     // Status 200 means the expired 2019 coupon was accepted — expiry validation is broken.
     expect(
@@ -91,15 +95,17 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Missing Encoding — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_retrieve_the_photo_of_bjoerns_cat_in_melee_combat_mode
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_retrieve_the_photo_of_bjoerns_cat_in_melee_combat_mode
-  test('Missing Encoding: URL with unencoded emoji must not crash the application', async ({ page }) => {
-    await page.goto(`${BASE}/#/search?q=😼`);
-    await page.waitForLoadState('networkidle');
-    const title = await page.title();
+  // The vulnerability: Juice Shop stores a cat emoji image (😼 = %F0%9F%98%BC) in the public uploads
+  // directory. The file is served at 200 because emoji characters in the filename were not encoded
+  // before storage, making the internal filename directly accessible.
+  test('Missing Encoding: emoji-named file in uploads must not be publicly accessible', async ({ request }) => {
+    const res = await request.get(`${BASE}/assets/public/images/uploads/%F0%9F%98%BC.jpg`);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Status 200 means the emoji-filename image is accessible — Missing Encoding vulnerability is present.
     expect(
-      title,
-      'Application must handle emoji in search without crashing or showing an error page'
-    ).toContain('OWASP Juice Shop');
+      res.status(),
+      'Emoji-named image in uploads directory must not be publicly accessible (Missing Encoding vulnerability present if 200)'
+    ).not.toBe(200);
   });
 
   // Payback Time — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_place_an_order_that_makes_you_rich
@@ -126,7 +132,8 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_bypass_a_security_control_with_a_poison_null_byte
   test('Poison Null Byte: null-byte-encoded path must not bypass FTP extension filter', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/eastere.gg%00.md');
+    // %00 (single-encoded) is rarely decoded server-side; %2500 (double-encoded) is the working bypass.
+    const res = await client.get('/ftp/eastere.gg%2500.md');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       res.status(),
@@ -136,16 +143,24 @@ test.describe('Improper Input Validation (OWASP A03:2021)', () => {
 
   // Repetitive Registration — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_follow_the_dry_principle_while_registering_a_user
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_follow_the_dry_principle_while_registering_a_user
-  test('Repetitive Registration: duplicate email registration must be rejected', async ({ request }) => {
-    const client = new JuiceShopApiClient(request);
-    const email = AuthHelper.uniqueEmail();
-    await client.register(email, 'Test@1234!');
-    const secondRes = await client.register(email, 'Test@1234!');
+  // The vulnerability (DRY principle): the server does not validate that password === passwordRepeat.
+  // A hardened server must reject mismatched confirmation passwords (400/422).
+  // On vulnerable Juice Shop, a registration with mismatched passwords is accepted (201).
+  test('Repetitive Registration: mismatched password confirmation must be rejected', async ({ request }) => {
+    const res = await request.post(`${BASE}/api/Users`, {
+      data: {
+        email: AuthHelper.uniqueEmail(),
+        password: 'Test@1234!',
+        passwordRepeat: 'DifferentPass@9999!',
+      },
+    });
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // Status 201 means the server accepted a registration where password ≠ passwordRepeat —
+    // the DRY principle confirmation check is absent.
     expect(
-      [400, 409, 422].includes(secondRes.status()),
-      'Registering the same email twice must be rejected'
-    ).toBe(true);
+      res.status(),
+      'Registration with mismatched passwordRepeat must be rejected (DRY principle violation present if 201)'
+    ).not.toBe(201);
   });
 
   // Upload Size — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/improper-input-validation.html#_upload_a_file_larger_than_100_kb

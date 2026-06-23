@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { createHmac, createPublicKey } from 'crypto';
 import { JuiceShopApiClient } from '../../helpers/api-client';
 import { AuthHelper } from '../../helpers/auth.helper';
 
@@ -47,47 +48,73 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
   // Forged Signed JWT — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_forge_an_almost_properly_rsa_signed_jwt_token
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_forge_an_almost_properly_rsa_signed_jwt_token
   test('Forged Signed JWT: RS256 token signed with the RSA public key must be rejected', async ({ request }) => {
-    // "Algorithm confusion" attack: server uses RS256 but if it falls back to HS256
-    // and the attacker signs with the public key, it would verify successfully.
-    const forgedToken = buildJwt(
-      { alg: 'HS256', typ: 'JWT' },
-      { sub: '1', email: 'admin@juice-sh.op', role: 'admin', iat: Math.floor(Date.now() / 1000) }
-    );
     const client = new JuiceShopApiClient(request);
+
+    // Fetch the RSA public key from the JWKS endpoint.
+    const jwksRes = await client.get('/.well-known/jwks.json');
+    const jwks = await jwksRes.json() as { keys?: Array<{ kty: string; n: string; e: string }> };
+    const jwk = jwks.keys?.[0];
+    expect(jwk, 'JWKS endpoint must return at least one RSA public key').toBeDefined();
+
+    // Convert the JWK to PEM — this is the PUBLIC key the attacker can obtain.
+    const publicKeyPem = createPublicKey({ key: { kty: jwk!.kty, n: jwk!.n, e: jwk!.e }, format: 'jwk' })
+      .export({ type: 'pkcs1', format: 'pem' }) as string;
+
+    // Build HS256 header + payload (same as a real admin token).
+    const header  = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({
+      sub: '1', email: 'admin@juice-sh.op', role: 'admin', iat: Math.floor(Date.now() / 1000),
+    })).toString('base64url');
+    const signingInput = `${header}.${payload}`;
+
+    // Sign with HMAC-SHA256 using the RSA public key as the HMAC secret (algorithm confusion).
+    const signature = createHmac('sha256', publicKeyPem).update(signingInput).digest('base64url');
+    const forgedToken = `${signingInput}.${signature}`;
+
     const res = await client.get('/api/Users/', forgedToken);
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       [401, 403].includes(res.status()),
-      'JWT forged via algorithm confusion must be rejected'
+      'JWT forged via RS256→HS256 algorithm confusion (signed with public key) must be rejected'
     ).toBe(true);
   });
 
   // Frontend Typosquatting — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_typosquatting_imposter_that_dug_itself_deep_into_the_frontend
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_shop_about_a_typosquatting_imposter_that_dug_itself_deep_into_the_frontend
-  test('Frontend Typosquatting: package-lock.json must not reference typosquatted packages', async ({ request }) => {
+  test('Frontend Typosquatting: package.json.bak must not contain typosquatted frontend packages', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/package.json.bak');
-    if (res.status() !== 200) return; // file not accessible — pass
+    // The null-byte bypass is required to access .bak files from the FTP directory.
+    const res = await client.get('/ftp/package.json.bak%2500.md');
+    // FAILURE CONDITION: Accessible backup file with typosquatted packages means the vulnerability is present.
+    expect(
+      res.status(),
+      'Developer backup must not be downloadable via %2500.md null-byte bypass'
+    ).not.toBe(200);
+    if (res.status() !== 200) return;
     const body = await res.text();
-    // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       body,
-      'Dependency manifest must not contain known typosquatted package names'
-    ).not.toMatch(/sequal|expres[^s]|lodahs|node-uuid-v4/i);
+      'Dependency manifest must not contain known typosquatted frontend package names (freexml++, etc.)'
+    ).not.toMatch(/freexml\+\+|sequal|expres[^s]|lodahs|node-uuid-v4/i);
   });
 
   // Legacy Typosquatting — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_shop_about_a_typosquatting_trick_it_has_been_a_victim_of
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_shop_about_a_typosquatting_trick_it_has_been_a_victim_of
-  test('Legacy Typosquatting: legacy npm package names must not be present in the dependency tree', async ({ request }) => {
+  test('Legacy Typosquatting: package.json.bak must not contain the hijacked epilogue-js package', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
-    const res = await client.get('/ftp/package.json.bak');
+    // Access the backup via null-byte bypass; epilogue-js is the legacy typosquatted package.
+    const res = await client.get('/ftp/package.json.bak%2500.md');
+    // FAILURE CONDITION: Accessible backup containing epilogue-js means the vulnerability is present.
+    expect(
+      res.status(),
+      'Developer backup must not be downloadable via %2500.md null-byte bypass'
+    ).not.toBe(200);
     if (res.status() !== 200) return;
     const body = await res.text();
-    // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
       body,
-      'Dependency manifest must not contain deprecated or hijackable legacy package names'
-    ).not.toMatch(/"sanitize-html":\s*"1\./);
+      'Dependency manifest must not reference the hijacked legacy package epilogue-js'
+    ).not.toMatch(/"epilogue-js"|"sanitize-html":\s*"1\./);
   });
 
   // Local File Read — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_gain_read_access_to_an_arbitrary_local_file_on_the_web_server
@@ -107,25 +134,21 @@ test.describe('Vulnerable Components (OWASP A06:2021)', () => {
 
   // Supply Chain Attack — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_inform_the_development_team_about_a_danger_to_some_of_their_credentials
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_inform_the_development_team_about_a_danger_to_some_of_their_credentials
-  test('Supply Chain Attack: integrity hashes must be present on externally loaded scripts', async ({ page }) => {
-    await page.goto(`${BASE}/`);
-    await page.waitForLoadState('networkidle');
-    const externalScripts = await page.evaluate<string[]>(() => {
-      return Array.from(document.querySelectorAll('script[src]'))
-        .filter(s => {
-          const src = (s as HTMLScriptElement).src;
-          return src.startsWith('http') && !src.includes('localhost');
-        })
-        .map(s => {
-          const integrity = (s as HTMLScriptElement).integrity;
-          return integrity || 'MISSING';
-        });
-    });
-    // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+  test('Supply Chain Attack: package.json.bak must not reference a known compromised dependency', async ({ request }) => {
+    const client = new JuiceShopApiClient(request);
+    // Access the backup via null-byte bypass; event-stream@3.3.6 was a known malicious package.
+    const res = await client.get('/ftp/package.json.bak%2500.md');
+    // FAILURE CONDITION: Accessible backup containing a compromised package is the vulnerability.
     expect(
-      externalScripts.some(i => i === 'MISSING'),
-      'All externally loaded scripts must have Subresource Integrity (SRI) hashes'
-    ).toBe(false);
+      res.status(),
+      'Developer backup must not be downloadable via %2500.md null-byte bypass'
+    ).not.toBe(200);
+    if (res.status() !== 200) return;
+    const body = await res.text();
+    expect(
+      body,
+      'Dependency manifest must not reference the known compromised package event-stream@3.3.6'
+    ).not.toMatch(/"event-stream":\s*"3\.3\.6"|"event-stream":\s*"\^3\.3/);
   });
 
   // Unsigned JWT — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/vulnerable-components.html#_forge_an_essentially_unsigned_jwt_token

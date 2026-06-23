@@ -12,21 +12,16 @@ test.describe('Security through Obscurity', () => {
 
   // Blockchain Hype — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-through-obscurity.html#_learn_about_the_token_sale_before_its_official_announcement
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_learn_about_the_token_sale_before_its_official_announcement
-  test('Blockchain Hype: hidden blockchain integration reference must not expose private keys', async ({ request }) => {
+  test('Blockchain Hype: hidden blockchain announcement page must not be publicly accessible', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
+    // The token sale is announced via a hidden blockchain.png reference — its existence IS the vulnerability.
     const res = await client.get('/assets/public/images/padding/blockchain.png');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // A 200 means the hidden blockchain image (which reveals the premature announcement) is accessible.
     expect(
-      [200, 404].includes(res.status()),
-      'Blockchain image endpoint must not return a 5xx error'
-    ).toBe(true);
-    if (res.status() === 200) {
-      const contentType = res.headers()['content-type'] ?? '';
-      expect(
-        contentType,
-        'Blockchain endpoint must return an image, not a JSON payload with credentials'
-      ).toMatch(/image\//);
-    }
+      res.status(),
+      'Hidden blockchain reference image must not be publicly accessible — its existence leaks the token sale'
+    ).not.toBe(200);
   });
 
   // Privacy Policy Inspection — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-through-obscurity.html#_prove_that_you_actually_read_our_privacy_policy
@@ -36,23 +31,26 @@ test.describe('Security through Obscurity', () => {
     await page.waitForLoadState('networkidle');
     const dom = await page.content();
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
+    // The privacy policy contains a hidden clickable element (easter egg) — detect invisible/zero-size interactives.
     expect(
       dom,
-      'Privacy policy page must not contain hidden script injections or executable markup outside normal <script> tags'
-    ).not.toMatch(/<script[^>]*>(?!.*?<\/script>)/s);
+      'Privacy policy must not contain hidden interactive elements (invisible text or zero-opacity clickable areas)'
+    ).not.toMatch(/cursor\s*:\s*pointer[^"']*opacity\s*:\s*0|opacity\s*:\s*0[^"']*cursor\s*:\s*pointer/i);
   });
 
   // Steganography — Hint: https://pwning.owasp-juice.shop/companion-guide/latest/part2/security-through-obscurity.html#_rat_out_a_notorious_character_hiding_in_plain_sight_in_the_shop
   // Solution: https://pwning.owasp-juice.shop/companion-guide/latest/appendix/solutions.html#_rat_out_a_notorious_character_hiding_in_plain_sight_in_the_shop
-  test('Steganography: product images must not expose credentials via HTTP response headers', async ({ request }) => {
+  test('Steganography: product image binary data must not contain embedded plaintext credentials', async ({ request }) => {
     const client = new JuiceShopApiClient(request);
     const res = await client.get('/assets/public/images/products/StrawberryShake.jpg');
-    const headers = res.headers();
+    if (res.status() !== 200) return;
+    // Steganographic content is embedded in pixel data — check raw body for plaintext credential strings.
+    const rawBody = (await res.body()).toString('latin1');
     // FAILURE CONDITION: This test must fail if the vulnerability is successfully executed or present.
     expect(
-      Object.values(headers).join(' '),
-      'Image response headers must not contain embedded credentials or secret data'
-    ).not.toMatch(/password|secret|key|token/i);
+      rawBody,
+      'Image binary data must not contain embedded plaintext credential strings'
+    ).not.toMatch(/password\s*[:=]\s*\S+|secret\s*[:=]\s*\S+/i);
   });
 
 });
